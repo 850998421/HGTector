@@ -1,0 +1,350 @@
+
+#######################################################
+#           HGTector v0.1.6 configuration             #
+#######################################################
+
+# This is an example of the configuration file (config.txt). It contains all parameters
+# of the program, as well as their default values and descriptions. One can create a new
+# config.txt, with parameters to be modified only.
+
+## Main ##
+
+  # Title of the analysis
+  title=
+
+  # Program behavior (0: automatic, 1: interactive)
+  interactive=1
+
+  # Work flow 
+  blaster=0                    # Step 1 - batch BLASTp searches
+  taxonomer=0                  # Step 2 - identify taxonomic information of returning matches (optional)
+  purifier=0                   # Step 3 - post-blast modifications of matches (optional)
+  analyzer=0                   # Step 4 - predict HGT events as well as gene loss and origination events
+  summarizer=0                 # Step 5 - summarize results and generate reports
+
+
+## Batch BLAST (blaster.pl) ##
+
+  # BLAST mode
+    # 0 (default): perform BLAST via http connection to the NCBI server
+    # 1: perform BLAST with standalone BLAST program (ncbi-blast+) to query remote database
+    # 2: perform BLAST with standalone BLAST program (ncbi-blast+) to query local database
+  blastMode=0
+
+  ## Program behavior ##
+
+    # Run multiple instances of Blaster simultaneously (http BLAST only)
+    ## 1: only one instance, 0: all genomes together
+    nBlaster=6
+
+    # Number of threads (CPUs) for local BLAST program
+    nThreads=4
+
+    # Web address of NCBI BLAST server
+    blastServer=http://www.ncbi.nlm.nih.gov/blast/Blast.cgi
+
+    # Number of retries on http connection (default = 10)
+    nRetry=5
+
+    # Time delay (seconds) between queries (in case the network does not allow repeated queries)
+    delay=5
+
+    # Retrieve taxonomy report (only available for http BLAST)
+    taxBlast=0
+
+    # Retrieve multiple sequence alignment (only available for http BLAST, 
+    alnBlast=0
+
+    # Retrieve original hit sequences (unaligned) (conflicts with alnBlast)
+    seqBlast=0
+
+
+  ## BLAST parameters ##
+
+    # BLAST database
+    dbBlast=nr
+
+    # Maximum E-value cutoff
+    evalue=1e-5
+
+    # Minimum percent identity cutoff
+    percIdent=
+
+    # Number of hits to return (default: 100)
+    nHit=250
+
+    # Exclude uncultured and environmental samples
+    exUncultured=1
+
+    # Search within the following taxon groups (taxids):
+    searchTaxids=
+
+    # Ignore organisms under the following taxids
+    ignoreTaxids=562,573,632,666,28901
+
+    # User-specified Entrez query text (will override settings above)
+    eqText=
+
+  ## Filterring BLAST hits ##
+
+    # Ignore taxon names that do not start with a capital letter
+    taxonUCASE=1
+
+    # Ignore taxon names containing the following words
+    ignoreTaxa=unknown,uncultured,unidentified,unclassified,environmental,plasmid,vector,synthetic,phage
+    ignoreTaxa=Escherichia coli,Yersinia pestis,Klebsiella pneumoniae,Salmonella enterica,Vibrio cholerae
+
+    # Ignore protein products containing the following words:
+    ## ignoreProducts=hypothetical,hypotethical,hypothetcial
+    ignoreProducts=
+
+    # Merge hits with same taxon names and bit scores
+    mergeDuplicates=1
+
+    # Trim the following words from the beginning of taxon names.
+    trimTaxa=Candidatus,uncultured,unidentified,unclassified,synthetic
+
+    # Maximum number of valid hits to preserve (default: infinite)
+    maxHits=200
+
+
+## Taxonomy information (taxonomer.pl) ##
+
+  # Source taxonomy information
+    # 0 (default): look up taxonomy information from remote database
+    # 1: look up taxonomy information from local database
+    # 2: don't look up (only use TaxBLAST returns)
+  srcTaxa=0
+
+  # Taxonomic ranks to record
+  ranks=species,genus,family,order,class,phylum
+
+
+## Post-blast treatments (purifier.pl) ##
+
+  # Ignore potential paralogs (hits from same organisms but with lower bit scores)
+  ignoreParalogs=1
+
+  # Ignore more than one subspecies from the same species
+  ignoreSubspecies=0
+
+  # Trim unreliable regions from sequence alignment (options: 0, gblocks)
+  trimSeq=0
+
+  # Realign sequences (options: 0, clustalw, mafft, muscle, clustalo)
+  realign=0
+
+  # Build phylogenetic tree using specified program
+     # options: clustalw, mafft (neighbor joining), phyml, raxml, fasttree (maximum likelihood)
+  buildTree=clustalw
+
+  # Perform bootstrap for designated times. Result will be appended to the tree as node support values
+     # available for RAxML and PhyML only
+  bsTree=0
+
+  # Compute distance matrix (only available when buildTree=something)
+  distance=1
+
+  # Protein substitution model for RAxML (options: DAYHOFF, DCMUT, JTT, MTREV, WAG (default), RTREV, CPREV, VT, BLOSUM62, MTMAM)
+  aaModel=WAG
+
+
+## Prediction algorithm (analyzer.pl) ##
+
+  ## Grouping scenario ##
+
+    # Include the following protein sets (in a desired order)
+    inSets=
+
+    # Exclude the following protein sets
+    exSets=
+
+    # Taxonomic rank(s) on which the program analyzes. All hits within the same rank as the input genomes
+    # are considered as 'self'. Meanwhile, all hits (excluding 'self' hits) within the rank that is one
+    # level higher are considered as 'close'. Everything else is defined as 'distal'. Here is an example.
+    # Suppose the input is five genomes within genus Escherichia, then:
+      # selfRank=genus			# genus level (Escherichia)
+      # selfRank=family			# family level (Enterobacteriaceae)
+      # selfRank=0			# the lowest rank that includes all input genomes (Escherichia)
+      # selfRank=1			# the second lowest rank (Enterobacteriaceae)
+    selfRank=family
+
+    # Manually specify TaxID(s) for each group (separate multiple TaxIDs with comma)
+    selfGroup=
+    closeGroup=
+
+
+  ## Sampling method ##
+
+    # Normalize bit scores as subject divided by query
+    normalize=1
+
+    # Use weight (sum of bit scores) instead of number of hits
+    useWeight=1
+
+    # Use phylogenetic distance instead of BLAST bit scores
+    useDistance=0
+
+    # Global or individual fingerprint (Blast hit distribution pattern)
+      # 0: each protein set has its own pattern
+      # 1: one pattern for all protein sets
+    unite=1
+
+  ## Fingerprints visualization ##
+
+    # Output raw number/weight data
+      # will output a tab-delimited text file, which can be directly read by R
+    outRaw=1
+
+    # Graph fingerprints
+      # 0: don't graph
+      # 1: draw histograms as text
+      # 2: graph with R (requires R and Perl module Statistics::R)
+    graphFp=1
+
+    # Graphing with R
+    boxPlot=1                    # box plot
+    histogram=1                  # histogram
+    densityPlot=1                # density plot
+      histDensity=0              # overlap histogram and density plot
+      merge3Groups=0             # overlap three groups in density plot
+    scatterPlot=1                # 2D scatter plot
+    plot3D=0                     # interactive 3D scatter plot (requires R package rgl)
+
+  ## (IMPORTANT) Cutoffs determination ##
+
+    # Way of determining cutoffs
+      # 0: user-specified global cutoff (%)
+      # 1: user-specified individual cutoffs (valid if unite = 1)
+      # 2: wait for user to type individual cutoffs
+      # 3: draw histogram and isolate the first peak
+      # 4: (requires R) perform kernel density estimation and isolate the first peak
+      # 5: (requires R) perform hierarchical clustering and isolate the first cluster
+    howCO=5
+
+    # User-specified Global cutoff (%). The default value is 25%, or the first quartile.
+      # it is used for all three groups if howCO = 0.
+      # it is also used for individual groups if other chosen approaches fail to determine cutoffs for
+      # these particular groups.
+    globalCO=25%
+
+    # User-specified cutoffs for individual groups
+      # will override global cutoffs
+      # accepts plain numbers (absolute value) or percentage (need postfix %) (quantile).
+      # for example, "1.35" means that values <= 1.35 are odd.
+      # for example, "25%" means that 25% data at the low end are odd.
+    selfCO=0
+    closeCO=
+    distalCO=
+
+    # Number of bins in histogram
+    nBin=20
+
+    # Exclude outliers at high end of each group
+      # 0: disable, 1: boxplot, 2: adjusted boxplot, 3: modified Z-score
+    exOutlier=0
+
+    # Stringency of picking cutoffs (available for howCO = 3 and 4)
+      # 0: liberal, 1: conservative
+    stringency=1
+
+
+  ## Prediction criteria ##
+
+    # Minimum number of valid hits to consider for HGT
+    minHits=0
+
+    # Minimum size (aa) of a valid protein
+    minSize=40
+
+    # HGT-derived genes must have low self number / weight (an optional criterion)
+    selfLow=0
+
+    # Show cutoffs in density plot (requires R) (temporarily unavailable)
+    # showCO=0
+
+    # Use conventional best BLAST match method instead of the present method:
+      # if the first non-self match is distal instead of close, then it is a case of HGT.
+    BBH=0
+
+
+## Summarize results and generate reports ##
+
+  # Ignore hypothetical proteins
+    # 0: don't ignore, 1: by product name, 2: by OG name
+  deHypo=0
+
+  # Summarize HGT events by putative donor group
+  byDonor=1
+
+    # on this rank
+    sumRank=order
+
+    # Ignore organisms without this rank defined
+    defOnly=1
+
+  # Summarize HGT events by functional annotation
+    # This program cannot perform functional annotation. One should provide external sources,
+    # such as the report generated by Blast2GO.
+  byFunction=0
+
+    # Directory of functional annotations
+    dirFunction=/media/Documents/HGT/Rickettsia/blast2go/summary
+
+  # Summarize HGT events by gene orthology
+  byOrthology=0
+
+    # Option A: refer to an external gene orthology scheme file
+    # Scheme of gene orthology (external file)
+    # (if empty, the program will compute one using build-in function based on BLAST hit clusterring)
+    smOrthology=
+
+    # Option B: use built-in function to infer gene orthology
+    # The criteria that two genes are deemed as an (co-)orthologous pair. Options:
+      # 1: one is a hit of the other
+      # 2: one is the best hit of the other
+      # 3: both are hits of each other
+      # 4: both are the best hits of each other (BBH, Overbeek et al., 1999)
+      # 5: one is the best hit, the other is any hit (COG, Tatusov et al., 1997)
+    pairRule=4
+
+    # Name OGs if necessary
+    nameOGs=1
+
+    # Exclude ORFans (genes only occurring once in all genomes)
+    exORFan=1
+
+  # Generate reports of the following formats
+  outText=1
+  outHTML=1
+  outExcel=0
+  
+  # Use protein names identified by orthologer (temporarily unavailable)
+  # OGnames=0
+
+  # In Excel spreadsheet, add hyperlinks to original BLAST reports
+  hyperlink=0
+
+  # Attach detailed outputs in Excel spreadsheet
+  detailExcel=1
+
+
+## External resources ##
+
+  # Third-party programs
+  blastdbcmd=blastdbcmd
+  blastp=blastp
+  gblocks=./Gblocks
+  clustalw=clustalw
+  mafft=mafft
+  muscle=muscle
+  raxml=raxmlHPC
+  phyml=phyml
+  mrbayes=mb
+
+# Local databases
+names.dmp=/media/Documents/Blast/taxonomy/names.dmp
+nodes.dmp=/media/Documents/Blast/taxonomy/nodes.dmp
+
+
+
