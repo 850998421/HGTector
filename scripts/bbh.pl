@@ -68,7 +68,7 @@ my $nThreads = 1;									# Multiple threads for local BLAST program
 if (-e "$wkDir/config.txt"){
 	open IN, "<$wkDir/config.txt";
 	while (<IN>){
-		s/^\s+//g; s/\s+$//g; next if /^#/; next unless $_;
+		s/#.*$//; s/\s+$//g; s/^\s+//g; next unless $_;
 		$blastMode = $1 if /^blastMode=(\d)$/;
 		$nHit = $1 if /^nHit=(\d+)$/;
 		$evalue = $1 if /^evalue=(.+)$/;

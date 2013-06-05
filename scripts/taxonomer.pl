@@ -33,16 +33,16 @@ sub remote_query(@);
 sub remote_query2();
 
 my $wkDir = $ARGV[0];					# working directory
-my $srcTaxa = 0;						# source taxonomy information
-my $nRetry = 10;						# number of retries of remote look-up
-my $delay = 1;							# time delay (seconds) between remote queries
+my $srcTaxa = 0;						# source taxonomy information (not available in this version
+my $nRetry = 5;							# number of retries of remote look-up
+my $delay = 5;							# time delay (seconds) between remote queries
 my @ranks = ('species', 'genus', 'family', 'order', 'class', 'phylum');
 
 if (-e "$wkDir/config.txt"){
 	open IN, "<$wkDir/config.txt";
 	while (<IN>){
 		s/#.*$//; s/\s+$//g; s/^\s+//g; next unless $_; 
-		$srcTaxa = $1 if /^nGenus=([012])$/;
+		$srcTaxa = $1 if /^srcTaxa=([012])$/;
 		$nRetry = $1 if /^nRetry=(\d+)$/;
 		$delay = $1 if /^delay=(\d+)$/;
 		@ranks = split (/,/, $1) if /^ranks=(.+)$/;

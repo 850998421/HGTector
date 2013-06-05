@@ -39,21 +39,21 @@ my $tree;											# phylogenetic tree with annotations
 
 ## program parameters ##
 
-my $wkDir = $ARGV[0];								# working directory
+my $wkDir = $ARGV[0];							# working directory
 
 my $minHits = 3;									# minimal number of valid hits to consider for HGT
 my $minSize = 0;									# minimal size (aa) of a valid protein (0 means infinite)
 
 my @ignoreTaxa = ();								# ignore taxon names containing the following words
-my $taxonUCASE = 0;									# ignore taxon names that do not start with a capital letter
-my $ignoreParalogs = 1;								# ignore potential paralogs (hits with same taxon names but different bit scores)
-my $ignoreSeqRepeats = 1;							# ignore repeated sequences (hits targetting different regions of the same protein)
-my $ignoreSubspecies = 0;							# ignore more than one subspecies from the same species
+my $taxonUCASE = 0;								# ignore taxon names that do not start with a capital letter
+my $ignoreParalogs = 1;							# ignore potential paralogs (hits with same taxon names but different bit scores)
+my $ignoreSeqRepeats = 1;						# ignore repeated sequences (hits targetting different regions of the same protein)
+my $ignoreSubspecies = 0;						# ignore more than one subspecies from the same species
 
 my $trimSeq = 0;									# trim unreliable regions from sequence alignment (options: 0, gblocks)
 my $realign = 0;									# realign sequences (options: 0, clustalw, mafft, muscle, clustalo)
-my $buildTree = "clustalw";								# Build phylogenetic tree using specified program (options: 0, clustalw, mafft, phyml, raxml)
-my $bsTree = 0;										# perform bootstrap for designated times.
+my $buildTree = 0;								# Build phylogenetic tree using specified program (options: 0, clustalw, mafft, phyml, raxml)
+my $bsTree = 0;									# perform bootstrap for designated times.
 my $distance = 0;									# use distance matrix instead of BLAST bit scores to rank hits (options: 0, clustalw, mafft, raxml)
 my $aaModel = "WAG";								# protein substitution model for RAxML (options: LG, WAG)
 

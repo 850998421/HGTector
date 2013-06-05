@@ -57,14 +57,15 @@ sub retry ();
 
 ## program parameters ##
 
-my $blastMode = 0;									# BLAST mode (0: via http connection, 1: standalone BLAST, remote database, 2: standalone BLAST, local database)
+my $blastMode = 0;								# BLAST mode (0: via http connection, 1: standalone BLAST, remote database, 2: standalone BLAST, local database)
 my $taxaMode = 0;									# taxonomy retriever mode (0: http, 1: local, via blastdbcmd, 2: local, from source file)
 
-my $nRetry = 10;									# maximum number of retries
-my $nHit = 250;										# number of hits to return
+my $nRetry = 5;									# maximum number of retries
+my $delay = 5;										# time delay (seconds) between two http requests
+my $nHit = 500;									# number of hits to return
 my $maxHits = 0;									# maximum number of valid hits to preserve. if 0 then = nHit
-my $evalue = 0.01;									# maximum E-value cutoff
-my $percIdent = 0;									# minimum percent identity cutoff
+my $evalue = 0.00001;							# maximum E-value cutoff
+my $percIdent = 0;								# minimum percent identity cutoff
 
 my $blastServer = "http://www.ncbi.nlm.nih.gov/blast/Blast.cgi";
 my $eSearchServer = "http://www.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi";
@@ -72,20 +73,18 @@ my $eFetchServer = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi";
 my $eSummaryServer = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi";
 
 my $dbBlast = "nr";
-my $exUncultured = 1;								# Exclude uncultured and environmental samples
-my @searchTaxids = ();								# search under the following taxon groups (taxids)
-my @ignoreTaxids = ();								# ignore organisms under the following taxids
+my $exUncultured = 1;							# Exclude uncultured and environmental samples
+my @searchTaxids = ();							# search under the following taxon groups (taxids)
+my @ignoreTaxids = ();							# ignore organisms under the following taxids
 my $eqText = "";									# entrez query parameter
 
 my $seqBlast = 0;									# retrieve hit sequences
 my $taxBlast = 0;									# retrieve taxonomy report
 my $alnBlast = 0;									# retrieve multiple sequence alignment (conflicts seqBlast)
 
-my $mergeDuplicates = 1;							# ignore hits with same taxon names and bit scores
-my $taxonUCASE = 1;									# ignore taxon names that do not start with a capital letter
+my $mergeDuplicates = 1;						# ignore hits with same taxon names and bit scores
+my $taxonUCASE = 1;								# ignore taxon names that do not start with a capital letter
 my @ignoreTaxa = ();								# ignore taxon names containing the following words
-my @trimTaxa = ();									# trim the following words from the beginning of taxon names
-													## not used in this script ##
 
 my $blastdbcmd = "blastdbcmd";
 my $blastp = "blastp";
@@ -96,13 +95,14 @@ my $nThreads = 1;									# Multiple threads for local BLAST program
 if (-e "$wkDir/config.txt"){
 	open IN, "<$wkDir/config.txt";
 	while (<IN>){
-		s/^\s+//g; s/\s+$//g; next if /^#/; next unless $_;
+		s/#.*$//; s/\s+$//g; s/^\s+//g; next unless $_;
 		$blastMode = $1 if /^blastMode=(\d)$/;
 		$nHit = $1 if /^nHit=(\d+)$/;
 		$evalue = $1 if /^evalue=(.+)$/;
 		$percIdent = $1 if /^percIdent=(.+)$/;
 
 		$nRetry = $1 if /^nRetry=(\d+)$/;
+		$delay = $1 if /^delay=(\d+)$/;
 		$maxHits = $1 if /^maxHits=(\d+)$/;
 		$dbBlast = $1 if /^dbBlast=(.+)$/;
 		$eqText = $1 if /^eqText=(.+)$/;
@@ -118,7 +118,6 @@ if (-e "$wkDir/config.txt"){
 		push @ignoreTaxa, split(/,/, $1) if /^ignoreTaxa=(.+)$/;
 		$taxonUCASE = $1 if /^taxonUCASE=([01])$/;
 		$mergeDuplicates = $1 if /^mergeDuplicates=([01])$/;
-		@trimTaxa = split(/,/, $1) if /^trimTaxa=(.+)$/;
 
 		$seqBlast = $1 if /^seqBlast=([01])$/;		
 		$taxBlast = $1 if /^taxBlast=([01])$/;
@@ -127,6 +126,7 @@ if (-e "$wkDir/config.txt"){
 	close IN;
 }
 
+@ignoreTaxa = split (/,/, "unknown,uncultured,unidentified,unclassified,environmental,plasmid,vector,synthetic,phage") unless @ignoreTaxa;
 
 ## generate Entrez query text ##
 
@@ -330,7 +330,7 @@ sub blast (){
 		if ($response->content =~ /^    RID = (.*$)/m){ $rid = $1; }else{ retry; return; };
 		if ($response->content =~ /^    RTOE = (.*$)/m){ sleep $1; }else{ retry; return; };
 		while (1){
-			sleep 5;
+			sleep $delay;
 			$args = "$blastServer?CMD=Get&FORMAT_OBJECT=SearchInfo&RID=$rid";
 			$req = new HTTP::Request GET => $args;
 			$response = $ua->request($req);
@@ -396,7 +396,7 @@ sub blast (){
 				while (1){
 					$s = get $eSummaryServer."?db=protein&id=".join (",", @b);
 					last if (defined $s);
-					sleep 10;
+					sleep $delay;
 				}
 				push (@a, $1) while ($s =~ s/<DocSum>(.+?)<\/DocSum>//s);
 				$i = 0; @b = ();
@@ -406,7 +406,7 @@ sub blast (){
 			while (1){
 				$s = get $eSummaryServer."?db=protein&id=".join (",", @b);
 				last if (defined $s);
-				sleep 10;
+				sleep $delay;
 			}
 			push (@a, $1) while ($s =~ s/<DocSum>(.+?)<\/DocSum>//s);	
 		}
@@ -434,13 +434,13 @@ sub blast (){
 			while (1){
 				$s = get "$eSearchServer?db=protein&term=$query";
 				last if (defined $s);
-				sleep 10;
+				sleep $delay;
 			}
 			$s =~ /<Id>(\d+)<\/Id>/;
 			while (1){
 				$s = get "$eSummaryServer?db=protein&id=$1";
 				last if (defined $s);
-				sleep 10;
+				sleep $delay;
 			}
 			$s =~ /<Item Name=\"Length\" Type=\"Integer\">(\d+)<\/Item>/;
 			$length = $1;
@@ -449,9 +449,9 @@ sub blast (){
 		# discard hits whose taxonomy information is unidentified #
 
 		foreach (keys %hits){
-			delete $hits{$_} unless exists $hits{$_}{'taxid'};
+			delete $hits{$_} and next unless exists $hits{$_}{'taxid'};
 			delete $hits{$_} unless $hits{$_}{'taxid'};
-			delete $hits{$_} unless exists $hits{$_}{'organism'};
+			delete $hits{$_} and next unless exists $hits{$_}{'organism'};
 			delete $hits{$_} unless $hits{$_}{'organism'};
 			delete $hits{$_} if ($hits{$_}{'organism'} =~ /^Unresolved/);
 			delete $hits{$_} if ($taxonUCASE and ($hits{$_}{'organism'} !~ /^[A-Z]/));
@@ -594,7 +594,7 @@ sub blast (){
 					while (1){
 						$t = get $eFetchServer."?db=protein&rettype=FASTA&id=".join (",", @b);
 						last if (defined $t);
-						sleep 10;
+						sleep $delay;
 					}
 					$s .= $t;
 					$i = 0; @b = ();
@@ -604,7 +604,7 @@ sub blast (){
 				while (1){
 					$t = get $eFetchServer."?db=protein&rettype=FASTA&id=".join (",", @b);
 					last if (defined $t);
-					sleep 10;
+					sleep $delay;
 				}
 				$s .= $t;
 			}
@@ -701,7 +701,7 @@ sub retry (){
 	if ($iRetry < $nRetry){ # retry
 		print ".";
 		$iRetry ++;
-		sleep 10;
+		sleep $delay;
 		blast;
 	}else{ # fail
 		$iRetry = 0;

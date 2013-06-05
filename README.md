@@ -3,7 +3,7 @@ HGTector
 
 A computational pipeline for genome-wide detection of horizontal gene transfer based on Blast hit distribution statistics
 
-Version: 0.1.6
+Version: 0.1.7
 
 Authors: Qiyun Zhu (<qiyunzhu@gmail.com>), Katharina Dittmar (<katharinad@gmail.com>)
 

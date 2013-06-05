@@ -37,6 +37,8 @@ my $i; my $j; my $n; my $s; my $t; my @a; my @b; my @c; my %h;
 sub median(@);
 sub mad(@);
 sub quantiles(@);
+sub z_scores(@);
+sub z_test(@);
 sub modified_z(@);
 sub boxplot(@);
 sub adjusted_boxplot(@);
@@ -47,15 +49,15 @@ sub recurse_Z(@);
 ## global variables ##
 
 my @sets;											# proteins sets to analyze
-my @lvs;											# taxonomic ranks to analyze
+my @lvs;												# taxonomic ranks to analyze
 my %selves = ();									# taxonomic information of self group
 my %lvList = ();									# list of taxids of each level
 
 my %taxadb = ();									# taxa.db
 my %ranksdb = ();									# ranks.db
-my %selfinfo = ();									# self.info
+my %selfinfo = ();								# self.info
 
-my %proteins = ();									# accn -> name (identified by COG)
+my %proteins = ();								# accn -> name (identified by COG)
 
 my @files;											# blast report files for each protein set
 
@@ -64,56 +66,70 @@ my %results = ();
 
 ## the phyletic pattern of the whole genome. I name it as "fingerprint"
 my %fpN = ();										# number of hits per blast
-# my %fpS = ();										# score of each hit of each blast
-													# not available in this version
+# my %fpS = ();									# score of each hit of each blast
+														# not available in this version
 
 ## program parameters ##
 
-my $wkDir = $ARGV[0];								# working directory
+my $wkDir = $ARGV[0];							# working directory
 my $interactive = 1;								# interactive or automatic mode
 
-my $minHits = 5;									# minimal number of hits a valid blast report should contain
+my $minHits = 0;									# minimal number of hits a valid blast report should contain
 my $maxHits = 0;									# maximal number of hits to retain from one blast, 0 means infinite
 my $minSize = 0;									# minimal size (aa) of a valid protein (0 means infinite)
-my $evalue = 1e-5;									# E-value cutoff
-my $deHypo = 0;										# ignore hypothetical proteins
+my $evalue = 1e-5;								# E-value cutoff
+my $deHypo = 0;									# ignore hypothetical proteins
 my $smOrthology;									# file containing scheme of orthology
 
 # algorithm
-my $selfRank = 0;										# taxonomic rank(s) on which the program analyzes
-my $normalize = 1;									# use relative bit score (bit score of subject / bit score of query)
+my $selfRank = 0;									# taxonomic rank(s) on which the program analyzes
+my $normalize = 1;								# use relative bit score (bit score of subject / bit score of query)
 my $unite = 1;										# Blast pattern (0: each genome has own pattern, 1: one pattern for all genomes)
 
 my $useDistance = 0;								# use phylogenetic distance instead of BLAST bit scores
-my $useWeight = 1;									# use weight (sum of scores) instead of number of hits
+my $useWeight = 1;								# use weight (sum of scores) instead of number of hits
 
 # fingerprints
-my $outRaw = 0;										# output raw number/weight data
-my $outFp = 1;										# output phyletic pattern
-my $graphFp = 1;									# graph fingerprint (requires R)
+my $outRaw = 1;									# output raw number/weight data
+my $outFp = 1;										# output fingerprint
+my $graphFp = 0;									# graph fingerprint (requires R)
 
 my $boxPlot = 1;									# box plot
-my $histogram = 1;									# histogram
+my $histogram = 1;								# histogram
 my $densityPlot = 1;								# density plot
-my $histDensity = 1;								# overlap histogram and density plot
-my $merge3Groups = 0;								# merge 3 groups in density plot
+my $histDensity = 0;								# overlap histogram and density plot
+my $merge3Groups = 0;							# merge 3 groups in density plot
 my $scatterPlot = 1;								# scatter plot
-my $plot3D = 1;										# 3-way scatter plot
+my $plot3D = 0;									# 3-way scatter plot
 
 # cutoffs
-my $howCO = 0;										# how to determine cutoffs (0: user-defined global cutoff (%), 1: user-defined individual
-													  # cutoffs, 2: wait for user input, 3: histogram, 4: kernel density estimation,
-													  # 5: hierarchical clustering)
+my $howCO = 4;										# how to determine cutoffs (0: user-defined global cutoff (%), 1: user-defined individual
+														  # cutoffs, 2: wait for user input, 3: histogram, 4: kernel density estimation,
+														  # 5: hierarchical clustering)
     
-my $globalCO = "25%";								# arbitrary global cutoff (%)
+my $globalCO = 0.25;								# arbitrary global cutoff (%)
 my ($selfCO, $closeCO, $distalCO) = (0, 0, 0);		# user-defined cutoffs for individual groups
 
-my $exOutlier = 0;									# exclude outliers, hits distant from other hits of the same group.
+my $exOutlier = 0;								# exclude outliers, hits distant from other hits of the same group
+
 my $nBin = 20;										# number of bins in histogram
-my $stringency = 1;									# stringency of picking cutoffs (0: liberal, 1: conservative)
+my $plotHist = 0;									# plot histogram on screen
+
+my $toolKDE = 0;									# computational tool for kernel density estimation
+my $bwF = 1;										# bandwidth selection factor
+my $plotKDE = 0;									# plot density function on screen
+my $toolExtrema = 0;								# computational tool for identifying local extrema of density function (0: Perl code, 1: R package "pastecs")
+my $modKCO = 1;									# location of cutoff (0: 1st pit, 1: midpoint of x-coordinates between 1st peak and 1st pit, 2/3: quantile
+my $qKCO = 0.5;									# horizontal/vertical quantile from 1st pit toward 1st peak
+
+my $dipTest = 0;									# perform non-unimodality test (Hartigan's dip test) and report p-value
+my $dipSig = 0;									# use global cutoff if dip test's result is not significant
+
 my $selfLow = 0;									# HGT-derived genes must have low self weight (an optional criterion)
 
 my $BBH = 0;										# use conventional best match method instead
+my $loss = 0;										# also report gene loss events
+my $POE = 0;										# also report POE
 
 my @ranks = ('species', 'genus', 'family', 'order', 'class', 'phylum');
 
@@ -122,7 +138,7 @@ my @closeGroup = ();
 my @inSets = ();
 my @exSets = ();
 
-my $R;												# R instance used by Statistics::R
+my $R;												# Statistics::R instance
 
 ## read configurations ##
 
@@ -150,15 +166,27 @@ if (-e "$wkDir/config.txt"){
 		$selfCO = $1 if /^selfCO=(.+)$/;
 		$closeCO = $1 if /^closeCO=(.+)$/;
 		$distalCO = $1 if /^distalCO=(.+)$/;
-				
+
 		$exOutlier = $1 if /^exOutlier=([0123])$/;
+
 		$nBin = $1 if /^nBin=(\d+)$/;
-		$stringency = $1 if /^stringency=([01])$/;
+		$plotHist = $1 if /^plotHist=([01])$/;
+
+		$toolKDE = $1 if /^toolKDE=([01])$/;
+		$bwF = $1 if /^bwF=(.+)$/;
+		$plotKDE = $1 if /^plotKDE=([01])$/;
+		$toolExtrema = $1 if /^toolExtrema=([01])$/;
+		$modKCO = $1 if /^modKCO=([0123])$/;
+		$qKCO = $1 if /^qKCO=(.+)$/;
+
+		$dipTest = $1 if /^dipTest=([01])$/;
+		$dipSig = $1 if /^dipSig=(.+)$/;
+
 		$selfLow = $1 if /^selfLow=([01])$/;
 		
 		$outRaw = $1 if /^outRaw=([01])$/;
 		$outFp = $1 if /^outFp=([01])$/;
-		$graphFp = $1 if /^graphFp=([012])$/;
+		$graphFp = $1 if /^graphFp=([01])$/;
 		$boxPlot = $1 if /^boxPlot=([01])$/;
 		$histogram = $1 if /^histogram=([01])$/;
 		$densityPlot = $1 if /^densityPlot=([01])$/;
@@ -168,6 +196,8 @@ if (-e "$wkDir/config.txt"){
 		$plot3D = $1 if /^plot3D=([01])$/;
 	
 		$BBH = $1 if /^BBH=([01])$/;
+		$loss = $1 if /^loss=([01])$/;
+		$POE = $1 if /^POE=([01])$/;
 		
 		@ranks = split (/,/, $1) if /^ranks=(.+)$/;
 
@@ -183,14 +213,13 @@ if (-e "$wkDir/config.txt"){
 
 if ($globalCO){
 	$globalCO = $globalCO / 100 if ($globalCO =~ s/%$//);
-	die "global cutoff must be between 1% and 99%.\n" if ($globalCO < 0.01 or $globalCO > 0.99);
+	die "Error: Global cutoff must be between 0 and 1.\n" if ($globalCO <= 0 or $globalCO >=1);
 }
 
-## initiate pipeline to access R ##
-# use Statistics::R;
-if ($howCO > 3 or $graphFp == 2){
+# conditionally use Statistics::R for Perl-R communication;
+if ($graphFp or ($howCO == 4 and ($toolKDE or $toolExtrema)) or ($howCO == 5) or $dipTest){
 	eval{ require Statistics::R; Statistics::R->import() };
-	die "Error: Perl module Statistics::R not available.\n" if ($@);
+	die "Error: Perl module Statistics::R is not available.\n" if ($@);
 	$R = Statistics::R->new();
 }
 
@@ -321,8 +350,9 @@ foreach (split (/,/, $selfRank)){
 }
 print "Analysis will work on the following taxonomic ranks:\n";
 for ($i=0; $i<=$#lvs; $i++){
-	print "  $lvs[$i]{'rank'} $lvs[$i]{'name'} (taxid: $lvs[$i]{'taxid'}) (".(keys %{$lvList{$lvs[$i]{'rank'}}})." members)\n";
-	print "  $lvs[$i]{'parentRank'} $lvs[$i]{'parentName'} (taxid: $lvs[$i]{'parentTaxid'}) (".(keys %{$lvList{$lvs[$i]{'parentRank'}}})." members)\n";
+	print "  Self: $lvs[$i]{'rank'} $lvs[$i]{'name'} (taxid: $lvs[$i]{'taxid'}) (".(keys %{$lvList{$lvs[$i]{'rank'}}})." members),\n";
+	print "  Close: $lvs[$i]{'parentRank'} $lvs[$i]{'parentName'} (taxid: $lvs[$i]{'parentTaxid'}) (".(keys %{$lvList{$lvs[$i]{'parentRank'}}})." members),\n";
+	print "  Distal: all other organisms.\n";
 }
 if ($interactive){
 	print "Press Enter to continue, or press Ctrl+C to exit:";
@@ -634,7 +664,7 @@ if ($outRaw){
 
 ## graph fingerprints with R ##
 
-if ($graphFp == 2){
+if ($graphFp){
 	print "\nGraphing fingerprints with R...";
 	$R->startR;
 	print "R cannot be started. Make sure it is properly installed in the system.\n" and exit 1 unless $R->is_started();
@@ -661,7 +691,7 @@ if ($graphFp == 2){
 			for (0..2){
 				if ($_ == 0){ $s = "Self"; }elsif ($_ == 1){ $s = "Close"; }else{ $s = "Distal"; }
 				$R->send("hist(x$_, breaks=$nBin, freq=F, col='lightgrey', xlab='Weight', ylab='Probability density', main='$s')");
-				$R->send("lines(density(x$_), lwd=2)") if $histDensity;
+				$R->send("lines(density(x$_".(",bw=bw.nrd0(x$_)*$bwF" x ($bwF and $bwF != 1))."), lwd=2)") if $histDensity;
 			}
 			$R->send("title(\"Histogram".(" and density function" x $histDensity)."$tpost\",outer=T)");
 			$R->send("dev.off()");
@@ -669,9 +699,9 @@ if ($graphFp == 2){
 		if ($densityPlot){
 			if ($merge3Groups){
 				$R->send("pdf(\"$fpre"."density.pdf\")");
-				$R->send("plot(density(x0), xlab='Weight', ylab='Probability density', main='Density plot$tpost')"); # xlim=range(0:1),
-				$R->send("lines(density(x1), col=2)");
-				$R->send("lines(density(x2), col=3)");
+				$R->send("plot(density(x0".(",bw=bw.nrd0(x0)*$bwF" x ($bwF and $bwF != 1))."), xlab='Weight', ylab='Probability density', main='Density plot$tpost')"); # xlim=range(0:1),
+				$R->send("lines(density(x1".(",bw=bw.nrd0(x1)*$bwF" x ($bwF and $bwF != 1))."), col=2)");
+				$R->send("lines(density(x2".(",bw=bw.nrd0(x2)*$bwF" x ($bwF and $bwF != 1))."), col=3)");
 				$R->send("legend(\"topright\",legend=c(\"self\",\"close\",\"distal\"),col=(1:3),lwd=2,lty=1)");
 				$R->send("dev.off()");
 			}elsif (not ($histogram and $histDensity)){
@@ -679,7 +709,7 @@ if ($graphFp == 2){
 				$R->send("par(mfrow=c(1,3), oma=c(0,0,3,0))");
 				for (0..2){
 					if ($_ == 0){ $s = "Self"; }elsif ($_ == 1){ $s = "Close"; }else{ $s = "Distal"; }
-					$R->send("plot(density(x$_), lwd=2, xlab='Weight', ylab='Probability density', main='$s')");
+					$R->send("plot(density(x$_".(",bw=bw.nrd0(x$_)*$bwF" x ($bwF and $bwF != 1))."), lwd=2, xlab='Weight', ylab='Probability density', main='$s')");
 				}
 				$R->send("title(\"Density plot$tpost\",outer=T)");
 				$R->send("dev.off()");
@@ -714,10 +744,11 @@ if ($graphFp == 2){
 ## Compute the statistics for the whole genome(s), i.e., phyletic pattern, or "fingerprint" ##
 
 print "\nComputing statistics...";
-if ($howCO > 3){
+if (($howCO == 4 and ($toolKDE or $toolExtrema)) or ($howCO == 5) or $dipTest){
 	$R->startR;
 	print "R cannot be started. Make sure it is properly installed in the system.\n" and exit 1 unless $R->is_started();
-	$R->send("library(pastecs)") if ($howCO == 4);
+	$R->send("library(pastecs)") if ($howCO == 4 and $toolExtrema);
+	$R->send("library(diptest)") if $dipTest;
 }
 
 foreach my $set (keys %fpN){
@@ -734,6 +765,7 @@ foreach my $set (keys %fpN){
 
 		my $global_cutoff;
 		my $computed_cutoff;
+		my $use_global = 0;
 
 		# compute basic statistical parameters
 		
@@ -760,7 +792,12 @@ foreach my $set (keys %fpN){
 				$global_cutoff = $a[$#a-int($i)];
 			}
 		}
+		print "  Global cutoff ($globalCO) = $global_cutoff.\n";
 
+		# override individual cutoff with global cutoff
+
+		$use_global = 1 if ((($key eq '0') and ($selfCO eq 'G')) or (($key eq '1') and ($closeCO eq 'G')) or (($key eq '2') and ($distalCO eq 'G')));
+		
 		# exclude outliers
 
 		if ($exOutlier){
@@ -775,6 +812,33 @@ foreach my $set (keys %fpN){
 					}
 				}
 			}
+		}
+
+		# perform Hartigan's dip test to assess non-unimodality
+
+		if ($dipTest){
+			print "  Performing Hartigan's dip test...";
+			$R->send("x<-c(".join (",", @a).")");
+			$R->send("dip.test(x)");
+			$s = $R->read;
+			if ($s =~ /D = \S+, p-value [<=] (\S+)\n/){
+				print "  done.\n  $&";
+				if ($dipSig){
+					if ($1 >= $dipSig){
+						print "  The weight distribution is NOT significantly non-unimodal.\n";
+						if ($howCO >= 3){
+							if ($interactive){
+								print "  Proceed with statistical analysis anyway (yes) or use global cutoff ($globalCO) instead (no)? ";
+								while (<STDIN>){
+									chomp; last unless $_;
+									last if (/^y$/i or /^yes$/i);
+									if (/^n$/i or /^no$/i){ $use_global = 1; last; }
+								}
+							}else{ $use_global = 1; }
+						}
+					}else{ print "  The weight distribution is significantly non-unimodal.\n"; }
+				}else{ print "  The weight distribution is ". ("NOT" x ($1 >= 0.05)). " significantly non-unimodal.\n"; }
+			}else{ print "  failed.\n"; }
 		}
 
 		# determine cutoff using histogram
@@ -797,11 +861,7 @@ foreach my $set (keys %fpN){
 		my $local_min = 0; # index of the lowest bar from left
 		for ($i=1; $i<$nBin-1; $i++){
 			if ($freqs[$i]<$freqs[$i-1] and $freqs[$i]<=$freqs[$i+1]){
-				if ($stringency){ # conservative: left border of this bin
-					$computed_cutoff = $interval*$i;
-				}else{ # liberal: midpoint of this bin
-					$computed_cutoff = $interval*($i+1/2);
-				}
+				$computed_cutoff = $interval*$i;
 				$local_min = $i;
 				last;
 			}
@@ -809,7 +869,8 @@ foreach my $set (keys %fpN){
 		
 		# draw histogram
 		
-		if ($graphFp == 1){
+		if ($plotHist){
+			print "  Histogram:";
 			@c = sort {$b<=>$a} @freqs;
 			$s = 50/$c[0];
 			my @widths = (0)x$nBin;
@@ -826,49 +887,182 @@ foreach my $set (keys %fpN){
 			}
 		}
 
-		# determine cutoff using kernel density estimation
+		# determine cutoff using kernel density estimation (KDE)
 
-		if ($howCO == 4){
-			print "  Conducting kernel density estimation...";
-			$R->send("x<-c(".join (",", @a).")");
-			$R->send("d<-density(x)");
-			$R->send("tp<-turnpoints(ts(d\$y))");
-			$R->send("summary(tp)");
-			$s = $R->read;
-			my $peak1st = 0;
-			my $failed = 0;
-			if ($s =~ /nbr turning points: 1 (first point is a peak)/){
-				$failed = 1;
-			}else{
-				if ($s =~ /first point is a peak/){
-					$peak1st = 1;
-				}elsif ($s =~ /first point is a pit/){
-					$peak1st = 0;
+		if ($howCO == 4 and not $use_global){
+		
+			# perform kernel density estimation (KDE)
+		
+			print "  Performing kernel density estimation...";
+			my (@dx, @dy); # x- and y-coornidates of density function
+			
+			# perform KDE using basic R command "density"
+			
+			if ($toolKDE){
+				$R->send("x<-c(".join (",", @a).")");
+				if ($bwF and $bwF != 1){
+					$R->send("bwx<-bw.nrd0(x)*$bwF");
+					$R->send("d<-density(x,bw=bwx)");
 				}else{
-					$failed = 1;
+					$R->send("d<-density(x)");
+				}
+				@dx = @{$R->get('d$x')};
+				@dy = @{$R->get('d$y')};
+			}
+			
+			# perform KDE using self-written Perl code
+			
+			else{
+				my $n = scalar @a;
+				my $mean; $mean += $_ for @a; $mean = $mean/$n;
+				my $stdev; $stdev += ($mean-$_)**2 for @a; $stdev = sqrt($stdev/($n-1));
+				my @Q = quantiles(@a); my $iqr = $Q[1]-$Q[0];
+				my $bw;
+				if ($stdev == 0 and $iqr == 0){ $bw = 1; }
+				elsif ($stdev == 0){ $bw = $iqr/1.34; }
+				elsif ($iqr == 0){ $bw = $stdev; }
+				elsif ($stdev <= $iqr/1.34){ $bw = $stdev; }
+				else{ $bw = $iqr/1.34; }
+				$bw = 0.9*$bw*$n**(-1/5); # select bandwidth by Silverman's ¡°rule of thumb¡± (1986)
+				$bw = $bw*$bwF if ($bwF and $bwF != 1);
+				my ($min, $max) = ($a[0]-3*$bw, $a[$#a]+3*$bw); # cut = 3
+				print "\n  N = $n, bandwidth = ".sprintf("%.3f", $bw).".\n";
+				for (my $x=$min; $x<=$max; $x+=($max-$min)/511) { # 512 points
+					my $e = 0; $e += exp(-(($x-$_)/$bw)**2/2)/sqrt(2*3.1415926536) for @a; # Gaussian kernel
+					push @dx, $x;
+					push @dy, 1/$n/$bw*$e;
 				}
 			}
-			unless ($failed){
-				$R->send("d\$x[tp\$tppos]");
-				$s = $R->read;
-				$s =~ s/\[\d+?\]//g;
-				$s =~ s/^\s+//;
-				@b = split(/\s+/, $s);
-				if ($peak1st){ # first extremum is a peak
-					if ($stringency){ $computed_cutoff = ($b[0]+$b[1])/2; } # conservative: midpoint between peak and pit
-					else{ $computed_cutoff = $b[1]; } # liberal: pit
-				}else{ # first extremum is a pit
-					if ($stringency){ $computed_cutoff = $b[0]/2; } # conservative: midpoint between pit and zero
-					else{ $computed_cutoff = $b[0]; } # liberal: pit
+			
+			print " done.\n";
+			
+			# plot density function on screen
+
+			if ($plotKDE){
+				print "  Density function:\n";
+				my $k_x = int(@dx/100);
+				$k_x = int(@dx/$plotKDE) if ($plotKDE > 1);
+				my $k_y = 0;
+				foreach (@dy){
+					$k_y = $_ if ($_ > $k_y);
+				}
+				$k_y = 64/$k_y;
+				for ($i=0; $i<=$#dy; $i+=$k_x){
+					print " "x(7-length(sprintf("%.2f", $dx[$i]))).sprintf("%.2f", $dx[$i]);
+					print " "x (int($dy[$i]*$k_y)+1)."*\n";
 				}
 			}
-			print "  done.\n";
+
+			my $peak1st;
+			my $failed;
+			my ($peak_i, $peak_x, $peak_y);
+			my ($pit_i, $pit_x, $pit_y);
+
+			# identify local extrema using R package "pastecs"
+			
+			if ($toolExtrema){
+				if ($toolKDE < 2){
+					$R->send("d<-data.frame(x=c(".join (",", @dx)."),y=c(".join (",", @dy)."))");
+				}
+				$R->send("tp<-turnpoints(ts(d\$y))");
+				if ($R->get('tp$firstispeak') eq "TRUE"){
+					if ($R->get('tp$nturns') == 1){ $failed = 1; }
+					else{ $peak1st = 1; }
+				}else{ $peak1st = 0; }
+				# $R->send("summary(tp)");
+				# $s = $R->read;
+				# if ($s =~ /nbr turning points: 1 (first point is a peak)/){
+				#	$failed = 1;
+				# }else{
+				#	if ($s =~ /first point is a peak/){
+				#		$peak1st = 1;
+				#	}elsif ($s =~ /first point is a pit/){
+				#		$peak1st = 0;
+				#	}else{
+				#		$failed = 1;
+				#	}
+				#}
+
+				unless ($failed){
+					my @tpx = @{$R->get("d\$x[tp\$tppos]")};
+					my @tpy = @{$R->get("d\$y[tp\$tppos]")};
+					if ($peak1st){
+						($peak_x, $peak_y) = ($tpx[0], $tpy[0]);
+						($pit_x, $pit_y) = ($tpx[1], $tpy[1]);
+					}else{
+						($peak_x, $peak_y) = ($dx[0], $dy[0]);
+						($pit_x, $pit_y) = ($tpx[0], $tpy[0]);
+					}
+					# $R->send("d\$x[tp\$tppos]");
+					# $s = $R->read;
+					# $s =~ s/\[\d+?\]//g;
+					# $s =~ s/^\s+//;
+					# @b = split(/\s+/, $s);
+					# if ($peak1st){ # first extremum is a peak
+					#	if ($stringency){ $computed_cutoff = ($b[0]+$b[1])/2; } # conservative: midpoint between peak and pit
+					#	else{ $computed_cutoff = $b[1]; } # liberal: pit
+					# }else{ # first extremum is a pit
+					#	if ($stringency){ $computed_cutoff = $b[0]/2; } # conservative: midpoint between pit and zero
+					#	else{ $computed_cutoff = $b[0]; } # liberal: pit
+					# }
+				}
+			}
+			
+			# identify local extrema using self-written Perl code
+			
+			else{
+				for ($i=0; $i<$#dy; $i++){
+					if ($dy[$i] < $dy[$i+1]){ $peak1st = 1; last; }
+					elsif ($dy[$i] > $dy[$i+1]){ $peak1st = 0; last; }
+					else{ next; }
+				}
+				if ($peak1st){
+					for ($i=1; $i<$#dy; $i++){
+						if (($dy[$i-1] <= $dy[$i]) and ($dy[$i] > $dy[$i+1])){
+							($peak_i, $peak_x, $peak_y) = ($i, $dx[$i], $dy[$i]);
+						}
+						if (($dy[$i-1] > $dy[$i]) and ($dy[$i] <= $dy[$i+1])){
+							($pit_i, $pit_x, $pit_y) = ($i, $dx[$i], $dy[$i]);
+						}
+						last if ($peak_i and $pit_i);
+					}
+					$failed = 1 unless $pit_i;
+				}else{
+					($peak_i, $peak_x, $peak_y) = (0, $dx[0], $dy[0]);
+					for (my $i=1; $i<$#dx; $i++){
+						if (($dy[$i-1] > $dy[$i]) and ($dy[$i] <= $dy[$i+1])){
+							($pit_i, $pit_x, $pit_y) = ($i, $dx[$i], $dy[$i]);
+						}
+						last if $pit_i;
+					}
+				}
+			}
+			
+			# locate cutoff point
+			
+			if ($modKCO == 0){ # pit
+				$computed_cutoff = $pit_x;
+			}elsif ($modKCO == 1){ # horizontal midpoint
+				$computed_cutoff = ($pit_x+$peak_x)/2;
+			}elsif ($modKCO == 2){ # horizontal quantile
+				$computed_cutoff = $pit_x-($pit_x-$peak_x)*$qKCO;
+			}else{ # vertical quantile
+				my $vCO = 0;
+				$vCO = $pit_y+($peak_y-$pit_y)*$qKCO;
+				for (my $i=$peak_i; $i<$pit_i; $i++){
+					if (($dy[$i] >= $vCO) and ($vCO > $dy[$i+1])){
+						$computed_cutoff = $dx[$i]+($dx[$i+1]-$dx[$i])*($dy[$i]-$vCO)/($dy[$i]-$dy[$i+1]);
+						last;
+					}
+				}
+			}
+
 		}
 		
 		# determine cutoff using hierarchical clustering
 
-		if ($howCO == 5){
-			print "  Conducting hierarchical clustering...";
+		if ($howCO == 5 and not $use_global){
+			print "  Performing hierarchical clustering...";
 			$R->send("x<-c(".join (",", @a).")");
 			$R->send("d<-dist(x,method=\"euclidean\")");
 			$R->send("fit<-hclust(d,method=\"ward\")");
@@ -876,7 +1070,7 @@ foreach my $set (keys %fpN){
 			my $nCluster = 1;
 			while ($nCluster++){
 				$R->send("c<-cutree(fit,k=$nCluster)");
-				my $clusters = $R->get('c');
+				my $clusters = $R->get('c'); # tip: return vector from R
 				@c = (()) x $nCluster; # data of clusters
 				for ($i=0; $i<=@{$clusters}-1; $i++){
 					foreach (1..$nCluster){
@@ -904,9 +1098,9 @@ foreach my $set (keys %fpN){
 		
 		# report cutoff to user
 		
-		if ($howCO == 0){ # user-defined global cutoff
+		if ($howCO == 0 or ($howCO >= 3 and $use_global)){ # user-defined global cutoff
 			$fpN{$set}{$key}{'cutoff'} = $global_cutoff;
-			print "  Cutoff is $global_cutoff (determined by global cutoff ". ($globalCO*100). "%).\n";
+			print "  Cutoff is $global_cutoff (determined by global cutoff $globalCO.\n";
 		}
 		if ($howCO == 1 and $unite){ # user-defined individual cutoff
 			if ($key eq '0'){ $s = $selfCO; }
@@ -920,13 +1114,13 @@ foreach my $set (keys %fpN){
 				print "  User-defined cutoff is not available. Use global cutoff $global_cutoff instead.\n";
 			}
 		}
-		if ($howCO > 2){ # computed cutoff
+		if ($howCO >= 3 and not $use_global){ # computed cutoff
 			$s = 0; if ($howCO == 3){ $s = "histogram"; }
 			elsif ($howCO == 4){ $s = "kernel density estimation"; }
 			elsif ($howCO == 5){ $s = "clustering analysis"; }
 			if ($computed_cutoff){
 				$fpN{$set}{$key}{'cutoff'} = $computed_cutoff;
-				print "  Cutoff is $computed_cutoff (determined by $s).\n";
+				print "  Cutoff is ".sprintf("%.3f", $computed_cutoff)." (determined by $s).\n";
 			}else{
 				$fpN{$set}{$key}{'cutoff'} = $global_cutoff;
 				print "  ". ucfirst($s) ." failed to identify a cutoff. Use global cutoff $global_cutoff instead.\n";
@@ -978,7 +1172,7 @@ foreach my $set (keys %fpN){
 		# 	else{ $fpS{$set}{$key}{'cutoff'} = $a[$#a-int($i)]; }
 	}
 }
-if ($howCO > 3){
+if (($howCO == 4 and ($toolKDE or $toolExtrema)) or ($howCO == 5) or $dipTest){
 	$R->stopR;
 }
 print " done.\n";
@@ -986,20 +1180,23 @@ print " done.\n";
 
 ## output fingerprint ##
 
-open OUT, ">$wkDir/result/statistics/fingerprint.txt";
-print OUT "#NEXUS\nBEGIN STATISTICS;\n";
-print OUT "\tGroup\tNumber\tMean\tSD\tMin\tMax\tMedian\tMAD\tQ1\tQ3\tCutoff\n";
-foreach my $set (sort keys %fpN){
-	foreach ('0','1','2'){
-		%h = %{$fpN{$set}{$_}};
-		if ($_ eq '0'){ $s = "self"; }elsif ($_ eq '1'){ $s = "close"; }elsif ($_ eq '2'){ $s = "distal"; }
-		if ($set eq '0'){ print OUT "all"; }else{ print OUT $set; }
-		print OUT "\t$s\t$h{'n'}\t".sprintf("%.2f", $h{'mean'})."\t".sprintf("%.2f", $h{'stdev'})."\t".sprintf("%.2f", $h{'min'})."\t".sprintf("%.2f", $h{'max'})."\t".sprintf("%.2f", $h{'median'})."\t".sprintf("%.2f", $h{'mad'})."\t".sprintf("%.2f", $h{'q1'})."\t".sprintf("%.2f", $h{'q3'})."\t".sprintf("%.2f", $h{'cutoff'})."\n";
+if ($outFp){
+	open OUT, ">$wkDir/result/statistics/fingerprint.txt";
+	print OUT "#NEXUS\nBEGIN STATISTICS;\n";
+	print OUT "\tGroup\tNumber\tMean\tSD\tMin\tMax\tMedian\tMAD\tQ1\tQ3\tCutoff\n";
+	foreach my $set (sort keys %fpN){
+		foreach ('0','1','2'){
+			%h = %{$fpN{$set}{$_}};
+			if ($_ eq '0'){ $s = "self"; }elsif ($_ eq '1'){ $s = "close"; }elsif ($_ eq '2'){ $s = "distal"; }
+			if ($set eq '0'){ print OUT "all"; }else{ print OUT $set; }
+			print OUT "\t$s\t$h{'n'}\t".sprintf("%.2f", $h{'mean'})."\t".sprintf("%.2f", $h{'stdev'})."\t".sprintf("%.2f", $h{'min'})."\t".sprintf("%.2f", $h{'max'})."\t".sprintf("%.2f", $h{'median'})."\t".sprintf("%.2f", $h{'mad'})."\t".sprintf("%.2f", $h{'q1'})."\t".sprintf("%.2f", $h{'q3'})."\t".sprintf("%.2f", $h{'cutoff'})."\n";
+		}
 	}
+	print OUT "END;\n";
+	close OUT;
+	print "Result is saved in result/statistics/fingerprint.txt.\n";
 }
-print OUT "END;\n";
-close OUT;
-print "Result is saved in result/statistics/fingerprint.txt.\n";
+
 if ($interactive){
 	print "Press Enter to proceed with prediction, or press Ctrl+C to exit:";
 	$s = <STDIN>;
@@ -1116,19 +1313,26 @@ foreach my $set (keys %results){
 	###### Output report ######
 
 	open (OUT, ">$wkDir/result/detail/$set.txt");
-	@a = ('Query','Length','Product','Hits','Self','Close','Distal','HGT','Loss','POE','Match');
+	@a = ('Query','Length','Product','Hits','Self','Close','Distal','HGT');
+	unless ($BBH){
+		push (@a, "Loss") if $loss;
+		push (@a, "POE") if $POE;
+	}
+	push @a, "Match";
 	print OUT "HGTector result of $set\n".join("\t",@a)."\n";
 	for ($i=0; $i<$n; $i++){
 		%h = %{$results{$set}[$i]};
 		print OUT $h{'query'}."\t".$h{'length'}."\t".$h{'product'}."\t".$h{'n'}."\t";
 		print OUT "\n" and next if ($minHits and ($h{'n'} < $minHits)) or ($minSize and ($h{'length'} < $minSize)); #####??????#######
 		print OUT sprintf("%.2f", $h{'N0'})."\t".sprintf("%.2f", $h{'N1'})."\t".sprintf("%.2f", $h{'N2'})."\t";
-		unless ($BBH){ 
-			print OUT $h{'income'}."\t".$h{'loss'}."\t".$h{'origin'}."\t";
+		unless ($BBH){
+			print OUT $h{'income'};
+			print OUT "\t".$h{'loss'} if $loss;
+			print OUT "\t".$h{'origin'} if $POE;
 		}else{
 			print OUT $h{'BBH'} if exists $h{'BBH'} and $h{'BBH'};
-			print OUT "\t\t\t";
 		}
+		print OUT "\t";
 		if (exists $h{'hit2'} and exists $taxadb{$h{'hit2'}}){
 			print OUT $h{'hit2'}." (".$taxadb{$h{'hit2'}}{'name'}.")";
 		}
@@ -1139,6 +1343,8 @@ foreach my $set (keys %results){
 print " done.\n";
 print "Prediction results are saved in result/detail/.\n";
 exit 0;
+
+
 
 ##################
 ## sub routines ##
@@ -1177,6 +1383,46 @@ sub quantiles (@){
 	return ($Q1,$Q3);
 }
 
+
+# compute Z-score (Z = (xi-x^)/s)
+
+sub z_scores(@){
+	my $mean = 0;
+	$mean += $_ for @_;
+	$mean = $mean / @_;
+	my $stdev = 0;
+	$stdev += ($mean-$_)**2 for @_;
+	$stdev = sqrt($stdev/(@_-1));
+	my @z = ();
+	push (@z, ($_-$mean)/$stdev) for @_;
+	return @z;
+}
+
+
+# Z-score test for outliers (|Z| > 3)
+
+sub z_test(@){
+	my @data = sort{$a<=>$b}@_;
+	my @z = z_scores(@data);
+	my $lower_fence = $data[0];
+	my $upper_fence = $data[$#data];
+	for (my $i=0; $i<=$#data; $i++){
+		if (abs($z[$i]) <= 3){
+			$lower_fence = $data[$i];
+			last;
+		}
+	}
+	for (my $i=$#data; $i>=0; $i--){
+		if (abs($z[$i]) <= 3){
+			$upper_fence = $data[$i];
+			last;
+		}
+	}
+	return ($lower_fence, $upper_fence);
+}
+
+# modified Z-score test for outliers (|modified_Z| > 3.5) (Iglewicz and Hoaglin, 1993)
+
 sub modified_z(@){
 	my @data = sort{$a<=>$b}@_;
 	my $lower_fence = $data[0];
@@ -1199,6 +1445,9 @@ sub modified_z(@){
 	return ($lower_fence, $upper_fence);
 }
 
+
+# boxplot test for outliers
+
 sub boxplot(@){
 	my $lower_fence, my $upper_fence;
 	my @data = sort{$a<=>$b}@_;
@@ -1209,6 +1458,9 @@ sub boxplot(@){
 	$upper_fence = $Q[1]+$f*$iqr;
 	return ($lower_fence, $upper_fence);
 }
+
+
+# adjusted boxplot test for outliers
 
 sub adjusted_boxplot(@){
 	my $lower_fence, my $upper_fence;

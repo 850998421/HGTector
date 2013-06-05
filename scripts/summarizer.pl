@@ -31,12 +31,15 @@ my $i; my $j; my $n; my $s; my $t; my @a; my @b; my @c; my %h;
 
 my $wkDir = $ARGV[0];
 
-my $deHypo = 1;						# ignore hypothetical proteins
+my $deHypo = 0;					# ignore hypothetical proteins
 
 my $byDonor = 1;					# summarize HGT events by organism
 my @ranks = ('species', 'genus', 'family', 'order', 'class', 'phylum');
-my $sumRank = "genus";				# on this rank
+my $sumRank = "order";			# on this rank
 my $defOnly = 1;					# ignore those without this rank defined
+
+my $byFunction = 0;				# summarize HGT by function
+my $dirFunction;					# directory containing functional annotations
 
 my $byOrthology = 0;				# generate report by ortholog
 my $smOrthology;					# file containing scheme of gene orthology
@@ -47,13 +50,10 @@ my %cogids = ();					# clusters of orthologs (COGs): accn -> ID
 my $isCOG = 0;						# whether use COG
 my %ORFans = ();					# ORFans set -> (array)
 
-my $byFunction = 0;					# summarize HGT by function
-my $dirFunction;					# directory containing functional annotations
-
 my $outText = 1;					# generate report in plain text
+my $outHTML = 1;					# generate report in web page (HTML)
 my $outExcel = 0;					# generate report in Excel spreadsheet
-my $outHTML = 0;					# generate report in web page (HTML)
-my $detailExcel = 0;				# attach detailed output in Excel workbook
+my $detailExcel = 1;				# attach detailed output in Excel workbook
 
 
 ## global variables ##
@@ -72,10 +72,11 @@ my %ranksdb = ();					# ranks.db
 my $workbook;						# Excel workbook
 my $worksheet;						# Excel worksheet
 my $excelRow;						# active row number
-my $excelTitle;						# Excel title format
+my $excelTitle;					# Excel title format
 my $excelHeader;					# Excel header format
 my ($excelGrey, $excelGreen, $excelYellow, $excelRed);				# Excel data formats
 
+my $iLoss = 0; my $iPOE = 0; my $iMatch = 0;
 
 ## Read configuration ##
 
@@ -190,11 +191,21 @@ if ($byOrthology){
 
 foreach my $set (@sets){
 	my %result = ();
+	my %titles = ();
 	@a = (); $ORFans{$set} = [@a];
 	open IN, "<$wkDir/result/detail/$set.txt";
 	while (<IN>){
-		s/\s+$//; next unless $_; next if (/^Query\t/); next if (/HGTector/);
+		s/\s+$//; next unless $_; next if (/HGTector/);
 		my @a = split (/\t/);
+		if (/^Query\t/){
+			next if ($iLoss+$iPOE+$iMatch);
+			for ($i=0; $i<=$#a; $i++){
+				$iLoss = $i if ($a[$i] eq "Loss");
+				$iPOE = $i if ($a[$i] eq "POE");
+				$iMatch = $i if ($a[$i] eq "Match");
+			}
+			next;
+		}
 		if ($deHypo){ # ignore hypothetical proteins
 			if ($isCOG and exists $cogids{$a[0]}){
 				my $name = $cogs[$cogids{$a[0]}]{'name'};
@@ -219,9 +230,9 @@ foreach my $set (@sets){
 			$gene{'close'} = $a[5];
 			$gene{'distal'} = $a[6];
 			$gene{'hgt'} = $a[7];
-			$gene{'loss'} = $a[8];
-			$gene{'poe'} = $a[9];
-			$gene{'match'} = $a[10];
+			$gene{'loss'} = $a[$iLoss] if $iLoss;
+			$gene{'poe'} = $a[$iPOE] if $iPOE;
+			$gene{'match'} = $a[$iMatch] if $iMatch;
 		}
 		$result{$a[0]} = {%gene};
 	}
@@ -264,44 +275,64 @@ if ($outHTML){
 
 ## Generate general report ##
 
-mkdir "$wkDir/result/HGT" unless -d "$wkDir/result/HGT"; mkdir "$wkDir/result/loss" unless -d "$wkDir/result/loss"; mkdir "$wkDir/result/POE" unless -d "$wkDir/result/POE";
+mkdir "$wkDir/result/HGT" unless -d "$wkDir/result/HGT";
+if ($iLoss){ mkdir "$wkDir/result/loss" unless -d "$wkDir/result/loss"; }
+if ($iPOE){ mkdir "$wkDir/result/POE" unless -d "$wkDir/result/POE"; }
 if ($outText){
 	open OUT, ">$wkDir/result/summary.txt";
 }
 if ($outHTML){
 	print HTML "  <p><h2>Summary</h2></p>";
-	print HTML "  <table border=1>\n   <tr>\n    <th width=120>Genome</th>\n    <th width=120>Total</th>\n    <th width=120>HGT</th>\n    <th width=120>Loss</th>\n    <th width=120>POE</th>\n   </tr>\n";
+	print HTML "  <table border=1>\n   <tr>\n    <th width=120>Genome</th>\n    <th width=120>Total</th>\n    <th width=120>HGT</th>\n";
+	print HTML "    <th width=120>Loss</th>\n" if $iLoss;
+	print HTML "    <th width=120>POE</th>\n" if $iPOE;
+	print HTML "   </tr>\n";
 }
 if ($outExcel){
 	$worksheet = $workbook->add_worksheet ('Summary');
 	$worksheet->set_row (0, 24);
 	$worksheet->set_column (0, 4, 12);
 	$worksheet->write (0, 0,  $title, $excelTitle);
-	$worksheet->write (1, 0, ['Genome', 'Total', 'HGT', 'Loss', 'POE'], $excelHeader);
+	$worksheet->write (1, 0, ['Genome', 'Total', 'HGT'], $excelHeader);
+	$worksheet->write (1, 3, 'Loss', $excelHeader) if $iLoss;
+	$i = 3; $i ++ if $iLoss;
+	$worksheet->write (1, $i, 'POE', $excelHeader) if $iPOE;
 	$excelRow = 2;
 }
 
 my $allhgt; # total number of HGT-derived genes
 foreach my $set (@sets){
 	my $hgt = 0; my $loss = 0; my $poe = 0;
-	open HGT, ">$wkDir/result/HGT/$set.txt"; open LOSS, ">$wkDir/result/loss/$set.txt"; open POE, ">$wkDir/result/POE/$set.txt";
+	open HGT, ">$wkDir/result/HGT/$set.txt";
+	open LOSS, ">$wkDir/result/loss/$set.txt" if $iLoss;
+	open POE, ">$wkDir/result/POE/$set.txt" if $iPOE;
 	my %result = %{$results{$set}};
 	my $total = keys %result;
 	foreach my $accn (sort keys %result){
 		print HGT $accn."\n" and $hgt ++ if (exists $result{$accn}{'hgt'} and $result{$accn}{'hgt'});
-		print LOSS $accn."\n" and $loss ++ if (exists $result{$accn}{'loss'} and $result{$accn}{'loss'});
-		print POE $accn."\n" and $poe ++ if (exists $result{$accn}{'poe'} and $result{$accn}{'poe'});
+		if ($iLoss){ print LOSS $accn."\n" and $loss ++ if (exists $result{$accn}{'loss'} and $result{$accn}{'loss'}); }
+		if ($iPOE){ print POE $accn."\n" and $poe ++ if (exists $result{$accn}{'poe'} and $result{$accn}{'poe'}); }
 	}
-	close HGT; close LOSS; close POE;
+	close HGT; close LOSS if $iLoss; close POE if $iPOE;
 	if ($outText){
 		print OUT "$set has $total "; print OUT "non-hypothetical " if $deHypo; print OUT "protein-coding genes.\n";
-		print OUT "  HGT: $hgt, loss: $loss, POE: $poe.\n\n";
+		print OUT "  HGT: $hgt";
+		print OUT ", Loss: $loss" if $iLoss;
+		print OUT ", POE: $poe" if $iPOE;
+		print OUT ".\n\n";
 	}
 	if ($outHTML){
-		print HTML "   <tr>\n    <td>$set</td>\n    <td><a href=\"../detail/$set.txt\">$total</a></td>\n    <td><a href=\"HGT/$set.txt\">$hgt</a></td>\n    <td><a href=\"loss/$set.txt\">$loss</a></td>\n    <td><a href=\"POE/$set.txt\">$poe</a></td>\n   </tr>\n";
+		print HTML "   <tr>\n    <td>$set</td>\n    <td><a href=\"../detail/$set.txt\">$total</a></td>\n    <td><a href=\"HGT/$set.txt\">$hgt</a></td>\n";
+		print HTML "    <td><a href=\"loss/$set.txt\">$loss</a></td>\n" if $iLoss;
+		print HTML "    <td><a href=\"POE/$set.txt\">$poe</a></td>\n" if $iPOE;
+		print HTML "   </tr>\n";
 	}
 	if ($outExcel){
-		$worksheet->write ($excelRow++, 0, [$set, $total, $hgt, $loss, $poe]);
+		$worksheet->write ($excelRow, 0, [$set, $total, $hgt]);
+		$worksheet->write ($excelRow, 3, $loss) if $iLoss;
+		$i = 3; $i ++ if $iLoss;
+		$worksheet->write ($excelRow, $i, $poe) if $iPOE;
+		$excelRow ++;
 	}
 	$allhgt += $hgt;
 }
@@ -309,7 +340,7 @@ close OUT if ($outText);
 print HTML "  </table>\n" if ($outHTML);
 
 
-## Generate by donor organism report ##
+## Generate by donor group report ##
 
 if ($byDonor){
 	foreach my $set (@sets){
@@ -337,6 +368,7 @@ if ($byDonor){
 				# elsif (exists $taxadb{$1} and substr ($taxadb{$1}{'rank'}, 0, 6) eq "/2759/"){ $organism = "Eukaryota"; }
 				# else{ next; }
 			}
+			$results{$set}{$accn}{'group'} = $organism;
 			if (exists $organisms{$organism}){
 				if ($organisms{$organism}{$set}){ $organisms{$organism}{$set} .= ",$accn"; }
 				else { $organisms{$organism}{$set} .= $accn; } 
@@ -346,7 +378,6 @@ if ($byDonor){
 				$h{$set} = $accn;
 				$organisms{$organism} = {%h};
 			}
-			
 		}
 	}
 	
@@ -356,8 +387,8 @@ if ($byDonor){
 		print OUT "Organism\tMean\t".join ("\t", @sets)."\n";
 	}
 	if ($outHTML){
-		print HTML "  <hr>\n  <p></p>\n  <p><h2>HGT by donor organism</h2></p>\n";
-		print HTML "  <p><font size='-1'>Genes are summarized by putative donor organism indicated by the best distal match. Note that the real donor might be an ancestor of the predicted donor.";
+		print HTML "  <br><hr>\n  <p></p>\n  <p><h2>HGT by putative donor group</h2></p>\n";
+		print HTML "  <p><font size='-1'>HGT-derived genes are summarized by putative donor group as indicated by the best distal match. Note that the real donor might be an ancestor of the match organism, therefore, a higher taxonomic rank is recommended to describe the donor group.";
 		print HTML "<br><font style='background-color: lightgreen'>green</font>: 1-4, <font style='background-color: khaki'>yellow</font>: 5-9, <font style='background-color: lightpink'>red</font>: 10+</font></p>\n";
 		print HTML "  <table border=1>\n   <tr>\n    <th width=250>Donor</th>\n    <th width=80>Mean</th>\n";
 		print HTML "    <th width=120>$_</th>\n" for (@sets);
@@ -497,8 +528,8 @@ if ($byFunction and -d $dirFunction){
 		print OUT "GO\tGroup\tTerm".join ("\t", @sets)."\n";
 	}
 	if ($outHTML){
-		print HTML "  <hr>\n  <p></p>\n  <p><h2>HGT by functional annotation</h2></p>";
-		print HTML "  <p><font size='-1'>Genes are summarized by annotated gene ontology (GO). Cell values are ratio of HGT-derived genes associated with a GO versus all genes associated with this GO. Every GO is counted if multiple GOes are associated with one gene.";
+		print HTML "  <br><hr>\n  <p></p>\n  <p><h2>HGT by functional annotation</h2></p>";
+		print HTML "  <p><font size='-1'>HGT-derived genes are summarized by annotated gene ontology (GO). Cell values are ratio of HGT-derived genes associated with a GO versus all genes associated with this GO. Every GO is counted if multiple GOes are associated with one gene.";
 		print HTML "<br>white: 0, <font style='background-color: lightgreen'>green</font>: (0, 0.1), <font style='background-color: khaki'>yellow</font>: [0.1, 0.5), <font style='background-color: lightpink'>red</font>: [0.5, 1]</font></p>\n";
 		print HTML "  <table border=1>\n   <tr>\n    <th width=60>GO</th>\n    <th width=240>Term</th>\n";
 		print HTML "    <th width=120>$_</th>\n" for (@sets);
@@ -584,8 +615,8 @@ if ($byOrthology){
 		print OUT "ID\tName\t".join ("\t", @sets)."\n";
 	}
 	if ($outHTML){
-		print HTML "  <hr>\n  <p></p>\n  <p><h2>HGT by gene orthology</h2></p>";
-		print HTML "  <p><font size='-1'>Genes are summarized by orthologous groups (OGs).";
+		print HTML "  <br><hr>\n  <p></p>\n  <p><h2>HGT by gene orthology</h2></p>";
+		print HTML "  <p><font size='-1'>HGT-derived genes are summarized by orthologous groups (OGs).";
 		print HTML "<br>empty: gene not present, <font style='background-color: lightgrey'>0</font>: gene present but not predicted as HGT, <font style='background-color: lightgreen'>1</font>: gene present and predicted as HGT, <font style='background-color: khaki'>m/n</font> (n>=2): n paralogs are present, in which m are predicted as HGT.</font></p>\n";
 		if ($cogs[0]{'name'}){ $i = 250; }else{ $i = 50; }
 		print HTML "  <table border=1>\n   <tr>\n    <th width=$i>OG</th>\n";
@@ -676,7 +707,7 @@ if ($byOrthology){
 	
 	if (%ORFans and 0){
 		if ($outText){ print OUT "#Singleton ORFans:\n"; }
-		if ($outHTML){ print HTML "  <hr>\n  <p></p>\n  <p><h3>Singleton ORFans</h2></p>\n"; }
+		if ($outHTML){ print HTML "  <br><hr>\n  <p></p>\n  <p><h3>Singleton ORFans</h2></p>\n"; }
 		foreach my $set (@sets){
 			if ($outText){ print OUT "$set: "; }
 			if ($outHTML){ print HTML "    <p><b>$set</b>: "; }
@@ -705,14 +736,18 @@ if ($outExcel and $detailExcel){
 	foreach my $set (@sets){
 		$worksheet = $workbook->add_worksheet ($set);
 		$worksheet->set_row (0, 24);
-		$worksheet->set_column (0, 0, 12);
-		$worksheet->set_column (1, 1, 6);
+		$worksheet->set_column (0, 0, 14);
+		$worksheet->set_column (1, 1, 8);
 		$worksheet->set_column (2, 2, 32);
 		$worksheet->set_column (3, 9, 8);
-		$worksheet->set_column (10, 10, 40);
+		$worksheet->set_column ($iMatch, $iMatch+$byDonor, 32) if $iMatch;
 		$worksheet->write (0, 0, $set, $excelTitle);
-		$worksheet->write (1, 0, ["Query","Length","Product","Hits","Self","Close","Distal","HGT","Loss","POE","Match"], $excelHeader);
-		$worksheet->write (1, 11, "Function", $excelHeader) if $byFunction;
+		$worksheet->write (1, 0, ["Query","Length","Product","Hits","Self","Close","Distal","HGT"], $excelHeader);
+		$worksheet->write (1, $iLoss, "Loss", $excelHeader) if $iLoss;
+		$worksheet->write (1, $iPOE, "POE", $excelHeader) if $iPOE;
+		$worksheet->write (1, $iMatch, "Best distal match", $excelHeader) if $iMatch;
+		$worksheet->write (1, $iMatch+1, "Putative donor group", $excelHeader) if $byDonor;
+		$worksheet->write (1, $iMatch+$byDonor+1, "Function", $excelHeader) if $byFunction;
 		$excelRow = 1;
 		%h = %{$results{$set}};
 		foreach my $accn (sort keys %h){
@@ -726,15 +761,18 @@ if ($outExcel and $detailExcel){
 			$worksheet->write_number ($excelRow, 5, $h{$accn}{'close'});
 			$worksheet->write_number ($excelRow, 6, $h{$accn}{'distal'});
 			$worksheet->write_number ($excelRow, 7, $h{$accn}{'hgt'}) if $h{$accn}{'hgt'};
-			$worksheet->write_number ($excelRow, 8, $h{$accn}{'loss'}) if $h{$accn}{'loss'};
-			$worksheet->write_number ($excelRow, 9, $h{$accn}{'poe'}) if $h{$accn}{'poe'};
-			next unless $h{$accn}{'match'};
+			$worksheet->write_number ($excelRow, $iLoss, $h{$accn}{'loss'}) if ($iLoss and $h{$accn}{'loss'});
+			$worksheet->write_number ($excelRow, $iPOE, $h{$accn}{'poe'}) if ($iPOE and $h{$accn}{'poe'});
+			next unless ($iMatch and $h{$accn}{'match'});
 			$h{$accn}{'match'} =~ /^(\d+) \((.+)\)$/;
-			$worksheet->write ($excelRow, 10, $2);
+			$worksheet->write ($excelRow, $iMatch, $2);
+			if ($byDonor and exists $h{$accn}{'group'}){
+				$worksheet->write ($excelRow, $iMatch+1, $h{$accn}{'group'});
+			}
 			if ($byFunction and exists $h{$accn}{'goes'}){
 				$s = $h{$accn}{'goes'};
 				$s =~ s/GO:\d+ \(.\) //g;
-				$worksheet->write ($excelRow, 11, $s);
+				$worksheet->write ($excelRow, $iMatch+$byDonor+1, $s);
 			}
 			# $worksheet->write_comment ($excelRow, 10, $1);
 		}

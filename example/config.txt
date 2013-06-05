@@ -1,0 +1,28 @@
+
+##########################################################
+#   Basic configurations for the G. sulphuraria example  #
+##########################################################
+
+title=Galdieria sulphuraria          # title of the task
+
+# BLAST parameters #
+delay=10                             # time delay (sec) between http requests
+nHit=100                             # return 100 hits per BLAST
+evalue=1e-10                         # E-value cutoff
+percIdent=0.6                        # percentage identity cutoff
+taxBlast=1                           # retrieve TaxBLAST reports
+alnBlast=1                           # retrieve hit sequence alignments
+
+# Grouping scenario #
+selfGroup=83373                      # Galdieria
+closeGroup=2759                      # eucaryotes
+
+# Algorithm parameters #
+howCO=4                              # (default) use kernel density estimation to determine cutoffs
+bwF=0.3                              # bandwidth selection factor
+plotKDE=1                            # draw kernel density function on screen
+modKCO=1                             # (default) cutoff is defined as the midpoint of the x-coordinates
+                                       # of the first peak and the first pit
+
+# Summary #
+POE=1                                # report putative ORFans or annotation errors

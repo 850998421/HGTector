@@ -1,10 +1,10 @@
 <!DOCTYPE HTML>
 <html>
 	<!--
-		This web page is a graphical user interface (GUI) of HGTector 0.1.6
+		This web page is a graphical user interface (GUI) of HGTector 0.1.7
 	-->
 	<head>
-		<title>HGTector 0.1.6 GUI</title>
+		<title>HGTector 0.1.7 GUI</title>
 		<style type="text/css" media=screen>
 			fieldset {
 				padding:1px;
@@ -78,10 +78,10 @@
 				val = document.getElementById('dbBlast').value; if (val != "nr"){ out.value += 'dbBlast='+val+'\n'; }
 				val = document.getElementById('evalue').value; if (val != "1e-5"){ out.value += 'evalue='+val+'\n'; }
 				val = document.getElementById('percIdent').value; if (val != ""){ out.value += 'percIdent='+val+'\n'; }
-				val = document.getElementById('nHit').value; if (val != "250"){ out.value += 'nHit='+val+'\n'; }
+				val = document.getElementById('nHit').value; if (val != "500"){ out.value += 'nHit='+val+'\n'; }
 				val = document.getElementById('maxHits').value; if (val != ""){ out.value += 'maxHits='+val+'\n'; }
 				val = document.getElementById('seqBlast').value; if (val == 1){ out.value += 'seqBlast=1\n'; }
-				if (document.getElementById('blastMode').value != 2 && document.getElementById('chkEntrez').checked){
+				if (document.getElementById('blastMode').value != 2){
 					if (document.getElementById('isEqText').checked){
 						val = document.getElementById('eqText').value; if (val != ""){ out.value += 'eqText='+val+'\n'; }
 					}else{
@@ -90,14 +90,12 @@
 						val = document.getElementById('ignoreTaxids').value; if (val != ""){ out.value += 'ignoreTaxids='+val+'\n'; }
 					}
 				}
-				if (document.getElementById('chkFilter').checked){
-					if (!document.getElementById('mergeDuplicates').checked){ out.value += 'mergeDuplicates=0\n' };
-					if (!document.getElementById('taxonUCASE').checked){ out.value += 'taxonUCASE=0\n' };
-					val = document.getElementById('ignoreTaxa').value; if (val != ""){ out.value += 'ignoreTaxa='+val+'\n'; }
-					val = document.getElementById('ignoreProducts').value; if (val != ""){ out.value += 'ignoreProducts='+val+'\n'; }
-				}
+				if (!document.getElementById('mergeDuplicates').checked){ out.value += 'mergeDuplicates=0\n' };
+				if (!document.getElementById('taxonUCASE').checked){ out.value += 'taxonUCASE=0\n' };
+				val = document.getElementById('ignoreTaxa').value; if (val != "unknown,uncultured,unidentified,unclassified,environmental,plasmid,vector,synthetic,phage"){ out.value += 'ignoreTaxa='+val+'\n'; }
 				val = document.getElementById('ranks').value; if (val != "species,genus,family,order,class,phylum"){ out.value += 'ranks='+val+'\n'; }
 				if (!document.getElementById('ignoreParalogs').checked){ out.value += 'ignoreParalogs=0\n' };
+				if (!document.getElementById('ignoreSeqRepeats').checked){ out.value += 'ignoreSeqRepeats=0\n' };
 				if (document.getElementById('ignoreSubspecies').checked){ out.value += 'ignoreSubspecies=1\n' };
 				if (!document.getElementById('realign').disabled){ out.value += 'realign='+document.getElementById('realign').value+'\n' };
 				if (!document.getElementById('trimSeq').disabled){ out.value += 'trimSeq='+document.getElementById('trimSeq').value+'\n' };
@@ -113,21 +111,18 @@
 				}
 				if (!document.getElementById('unite').checked){ out.value += 'unite=0\n' };
 				if (document.getElementById('useDistance').checked){ out.value += 'useDistance=1\n' };
-				val = document.getElementById('graphFp').value;
-				if (val != 1){
-					out.value += 'graphFp='+val+'\n';
-					if (val == 2){
-						if (!document.getElementById('boxPlot').checked){ out.value += 'boxPlot=0\n' };
-						if (!document.getElementById('histogram').checked){ out.value += 'histogram=0\n' };
-						if (!document.getElementById('densityPlot').checked){ out.value += 'densityPlot=0\n' };
-						if (!document.getElementById('scatterPlot').checked){ out.value += 'scatterPlot=0\n' };
-						if (document.getElementById('plot3D').checked){ out.value += 'plot3D=1\n' };
-						if (document.getElementById('histDensity').checked){ out.value += 'histDensity=1\n' };
-						if (document.getElementById('merge3Groups').checked){ out.value += 'merge3Groups=1\n' };
-					}
+				if (document.getElementById('chkGraph').checked){
+					out.value += 'graphFp=1\n';
+					if (!document.getElementById('boxPlot').checked){ out.value += 'boxPlot=0\n' };
+					if (!document.getElementById('histogram').checked){ out.value += 'histogram=0\n' };
+					if (!document.getElementById('densityPlot').checked){ out.value += 'densityPlot=0\n' };
+					if (!document.getElementById('scatterPlot').checked){ out.value += 'scatterPlot=0\n' };
+					if (document.getElementById('plot3D').checked){ out.value += 'plot3D=1\n' };
+					if (document.getElementById('histDensity').checked){ out.value += 'histDensity=1\n' };
+					if (document.getElementById('merge3Groups').checked){ out.value += 'merge3Groups=1\n' };
 				}
 				val = document.getElementById('howCO').value;
-				if (val != 3){ out.value += 'howCO='+val+'\n'; }
+				if (val != 4){ out.value += 'howCO='+val+'\n'; }
 				if (val == 1){
 					if (document.getElementById('selfCO').value != ""){ out.value += 'selfCO='+document.getElementById('selfCO').value+'\n'; }
 					if (document.getElementById('closeCO').value != ""){ out.value += 'closeCO='+document.getElementById('closeCO').value+'\n'; }
@@ -135,15 +130,26 @@
 				}
 				if (val >= 3){
 					if (!document.getElementById('exOutlier').disabled){ out.value += 'exOutlier='+document.getElementById('exOutlier').value+'\n'; }
+					if (!document.getElementById('dipTest').disabled && document.getElementById('dipTest').checked){
+						out.value += 'dipTest=1\n';
+						if (!document.getElementById('isDipSig').disabled && document.getElementById('isDipSig').checked){ out.value += 'dipSig='+document.getElementById('dipSig').value+'\n'; }
+					}
 				}
-				if (val == 3 || val == 4){
-					if (document.getElementById('stringency').value != 1){ out.value += 'stringency=0\n'; }
+				if (val == 3){
+					if (document.getElementById('nBin').value != "20"){ out.value += 'nBin='+document.getElementById('nBin').value+'\n'; }
+					if (document.getElementById('plotHist').checked){ out.value += 'plotHist=1\n'; }
 				}
-				val = document.getElementById('nBin').value; if (val != "20"){ out.value += 'nBin='+val+'\n'; }
-				val = document.getElementById('globalCO').value; if (val != "" && val != "25%"){ out.value += 'globalCO='+val+'\n'; }
+				if (val == 4){
+					if (document.getElementById('toolKDE').value == 1){ out.value += 'toolKDE=1\n'; }
+					if (document.getElementById('bwF').value != "1"){ out.value += 'bwF='+document.getElementById('bwF').value+'\n'; }
+					if (document.getElementById('plotKDE').checked){ out.value += 'plotKDE=1\n'; }
+					if (document.getElementById('toolExtrema').checked){ out.value += 'toolExtrema=1\n'; }
+					if (document.getElementById('modKCO').value != 1){ out.value += 'modKCO='+document.getElementById('modKCO').value+'\n'; }
+					if (document.getElementById('qKCO').value != "0.5"){ out.value += 'qKCO='+document.getElementById('qKCO').value+'\n'; }
+				}
+				val = document.getElementById('globalCO').value; if (val != "" && val != "0.25"){ out.value += 'globalCO='+val+'\n'; }
 				val = document.getElementById('minHits').value; if (val != "0"){ out.value += 'minHits='+val+'\n'; }
-				val = document.getElementById('minSize').value; if (val != "40"){ out.value += 'minSize='+val+'\n'; }
-				
+				val = document.getElementById('minSize').value; if (val != "0"){ out.value += 'minSize='+val+'\n'; }
 				if (document.getElementById('selfLow').checked){ out.value += 'selfLow=1\n'; }
 				if (document.getElementById('BBH').checked){ out.value += 'BBH=1\n'; }
 				val = document.getElementById('deHypo').value; if (val != 0){ out.value += 'deHypo='+val+'\n'; }
@@ -169,15 +175,16 @@
 				if (!document.getElementById('outText').checked){ out.value += 'outText=0\n'; }
 				if (!document.getElementById('outHTML').checked){ out.value += 'outHTML=0\n'; }
 				if (document.getElementById('outExcel').checked){ out.value += 'outExcel=1\n'; }
+				if (!out.value){ out.value = "# You didn't change any default settings."; }
 			}
 		</script>
 	</head>
 	
 	<body style="width:800px;margin-left:auto;margin-right:auto;">
-		<p><h3>HGTector 0.1.6 configuration file generator</h3></p>
+		<p><h3>HGTector 0.1.7 configuration file generator</h3></p>
 		<p>Qiyun Zhu, Katharina Dittmar</p>
 		<hr>
-		<p>Welcome! This page will guide you through the process of building a valid configuration file for HGTector.</p>
+		<p>Welcome! This page will guide you through the process of building a valid configuration file for HGTector. You may refer to <a href="docs/quickstart.html">Quick Start Guide</a> or <a href="docs/manual.html">User Manual</a> for further instructions.</p>
 		<p>Title of the task: <input type="text" id="title" size=40> Program mode: <select id="interactive"><option value=0>automatic</option><option value=1 selected="selected">interactive</option></select></p>
 		<hr>
 		<p></p>
@@ -186,9 +193,10 @@
 		<p class="header"><input type="button" id="btnCheck" value="Show" onclick="show_hide_section('Check')"> Checklist</p>
 		<div id="divCheck" style="display:none">
 			<p>HGTector's minimum requirement is but <a href="http://www.perl.org/">Perl</a>, a standard component of many systems. However, if you have some of the following programs and packages equipped in the system, they will provide more options for your task.<p>
-			<p><input type="checkbox" id="chkR" onchange="show_hide_subsection('R')"> <a href="http://www.r-project.org/">R</a>. HGTector calls R to perform some advanced statistical computing and graphics. To enable the communication between Perl and R, you also need to install Perl package <b>Statistics::R</b>.<p>
+			<p><input type="checkbox" id="chkR" onchange="show_hide_subsection('R');"> <a href="http://www.r-project.org/">R</a>. HGTector calls R to perform some advanced statistical computing and graphics. To enable the communication between Perl and R, you also need to install Perl package <b>Statistics::R</b>.<p>
 			<div class="subsection" id="divR" style="display:none">
-				<p><input type="checkbox" id="pastecs"> R package <b>pastecs</b> computes local extrema of a density function, which is necessary for determining cutoffs using kernel density estimation.</p>
+				<p><input type="checkbox" id="diptest"> R package <b>diptest</b> performs Hartigan's dip test to assess the significance of non-unimodality of weight distributions.</p>
+				<p><input type="checkbox" id="pastecs"> R package <b>pastecs</b> identifies local extrema of a kernel density function, in order to determine cutoffs.</p>
 				<p><input type="checkbox" id="rgl"> R package <b>rgl</b> creates interactive 3D scatter plots to visualize your data.</p>
 			</div>
 			<p><input type="checkbox" id="chkNcbiBlast" onchange="show_hide_subsection('NcbiBlast')"> <a href="http://blast.ncbi.nlm.nih.gov/Blast.cgi?CMD=Web&PAGE_TYPE=BlastDocs&DOC_TYPE=Download">NCBI BLAST+</a>, the standalone BLAST program that allows you to perform BLAST locally, which is a non-default option for HGTector.</p>
@@ -264,7 +272,7 @@
 						Percent identity (%) cutoff: <input type="text" id="percIdent" size=4>
 					</p>
 					<p>
-						Number of hits to return: <input type="text" id="nHit" size=4 value="250">
+						Number of hits to return: <input type="text" id="nHit" size=4 value="500">
 						Number of valid hits to preserve: <input type="text" id="maxHits" size=4> [<a href="javascript:show_hide_tooltip('Nhit')">?</a>]
 					</p>
 					<p class="tooltip" id="tipNhit" style="display:none">Please specify a proper number so that adequate hits from all three groups can be retrieved.</p>
@@ -272,10 +280,11 @@
 			</fieldset>
 			<p><input type="checkbox" id="seqBlast"> Retrieve sequences of hits</p>
 			<fieldset id="fieldEntrez">
-				<legend><input type="checkbox" id="chkEntrez" onchange="show_hide_subsection('Entrez')"> Entrez query </legend>
-				<div id="divEntrez" class="subsection" style="display:none">
+				<legend> Entrez query </legend>
+				<div id="divEntrez" class="subsection">
 					<p><input type="checkbox" id="exUncultured" checked> Exclude uncultured and environmental samples</p>
-					<p>Search within the following taxon groups (TaxIDs):<br><input type="text" id="searchTaxids" size=60></p>
+					<p>Search within the following taxon groups (TaxIDs): [<a href="javascript:show_hide_tooltip('TaxID')">?</a>]<br><input type="text" id="searchTaxids" size=60></p>
+					<p class="tooltip" id="tipTaxID" style="display:none">The TaxID of a taxonomic group can be looked up from the <a href="http://www.ncbi.nlm.nih.gov/taxonomy">NCBI taxonomy database</a>.</p>
 					<p>Ignore organisms under the following taxon groups (TaxIDs):<br><input type="text" id="ignoreTaxids" size=60></p>
 					<p><input type="checkbox" id="isEqText" onchange="
 						document.getElementById('eqText').disabled=!this.checked;
@@ -288,12 +297,11 @@
 			</fieldset>
 			<br>
 			<fieldset>
-				<legend><input type="checkbox" id="chkFilter" onchange="show_hide_subsection('Filter')"> Linguistic filter </legend>
-				<div id="divFilter" class="subsection" style="display:none">
+				<legend> Linguistic filter </legend>
+				<div id="divFilter" class="subsection">
 					<p><input type="checkbox" id="mergeDuplicates" checked> Merge hits with same taxon names and bit scores</p>
 					<p><input type="checkbox" id="taxonUCASE" checked> Ignore taxon names not starting with a capital letter</p>
 					<p>Ignore taxon names containing the following words:<br><input type="text" id="ignoreTaxa" size=60 value="unknown,uncultured,unidentified,unclassified,environmental,plasmid,vector,synthetic,phage"></p>
-					<p>Ignore protein products containing the following words:<br><input type="text" id="ignoreProducts" size=40></p>
 				</div>
 			</fieldset>
 		</div>
@@ -302,16 +310,17 @@
 		<p class="header"><input type="button" id="btnTaxonomer" value="Show" onclick="show_hide_section('Taxonomer')"> Step 2: Taxonomer</p>
 		<div id="divTaxonomer" style="display:none">
 			<p>Taxomoner retrieves taxonomic information of hits of proteins.</p>
-			<p>Taxonomic ranks to record: <input type="text" id="ranks" size=60 value="species,genus,family,order,class,phylum"> [<a href="javascript:show_hide_tooltip('Ranks')">?</a>]</p>
-			<p class="tooltip" id="tipRanks" style="display:none">For each organism shown in BLAST result, the program will record the taxonomic groups on these ranks (if available) in the designated order. You can add more ranks, such as "tribe" or "superkingdom", to meet specific needs.</p>
+			<p>Taxonomic ranks to record: <input type="text" id="ranks" size=50 value="species,genus,family,order,class,phylum"> [<a href="javascript:show_hide_tooltip('Ranks')">?</a>]</p>
+			<p class="tooltip" id="tipRanks" style="display:none">For each organism shown in BLAST reports, the program will record its taxonomic group names on these ranks (if available) in the designated order (low-to-high). You can add more ranks, such as "tribe" or "superkingdom", to meet specific needs.</p>
 		</div>
 
 		<!--Step 3: Purifier-->
 		<p class="header"><input type="button" id="btnPurifier" value="Show" onclick="show_hide_section('Purifier')"> Step 3: Purifier</p>
 		<div id="divPurifier" style="display:none">
 			<p>Purifier is an optional step. It further processes the BLAST results.</p>
-			<p><input type="checkbox" id="ignoreParalogs" checked> Ignore potential paralogs (hits from same organisms but with lower bit scores)</p>
-			<p><input type="checkbox" id="ignoreSubspecies"> Ignore more than one subspecies from the same species</p>
+			<p><input type="checkbox" id="ignoreParalogs" checked> Ignore potential paralogs (hits from same organisms but with lower bit scores).</p>
+			<p><input type="checkbox" id="ignoreSeqRepeats" checked> Ignore repeated sequence domains (hits) within the same protein.</p>
+			<p><input type="checkbox" id="ignoreSubspecies"> Ignore more than one subspecies from the same species.</p>
 			<p><input type="checkbox" onchange="document.getElementById('realign').disabled=!this.checked"> Realign sequences, using: 
 				<select id="realign" disabled=true">
 					<option value='ClustalW'>ClustalW</option>
@@ -334,8 +343,8 @@
 				</select> [<a href="javascript:show_hide_tooltip('Tree')">?</a>]
 			</p>
 			<p class="tooltip" id="tipTree" style="display:none">The tree will be appended to the BLAST report in NEXUS format. You can directly open the file to watch the tree using programs like FigTree.</p>
-			<p><input type="checkbox" id="distance"> Compute phylogenetic distance matrix [<a href="javascript:show_hide_tooltip('Distance')">?</a>]</p>
-			<p class="tooltip" id="tipDistance" style="display:none">Check if you may use distance instead of number or weight for the subsequent prediction.</p>
+			<p><input type="checkbox" id="distance"> Compute and record phylogenetic distance matrix [<a href="javascript:show_hide_tooltip('Distance')">?</a>]</p>
+			<p class="tooltip" id="tipDistance" style="display:none">Check it if you consider using phylogenetic distances instead of BLAST bit scores for the subsequent prediction.</p>
 		</div>
 
 		<!--Step 4: Analyzer-->
@@ -384,8 +393,8 @@
 			</fieldset>
 			<br>
 			<fieldset>
-				<legend>Graphing: <select id="graphFp" onchange="	if(this.value==2){document.getElementById('divGraphR').style.display='block';}else{document.getElementById('divGraphR').style.display='none';}"><option value=0>don't graph</option><option value=1 selected="selected">draw histogram as text</option><option value=2>graph with R</option></select></legend>
-				<div id="divGraphR" class="subsection" style="display:none">
+				<legend><input type="checkbox" id="chkGraph" onchange="show_hide_subsection('Graph')"> Graphing (requires R) </legend>
+				<div id="divGraph" class="subsection" style="display:none">
 					<p><input type="checkbox" id="boxplot" checked> Box plot <input type="checkbox" id="histogram" checked> Histogram <input type="checkbox" id="densityPlot" checked> Density plot <input type="checkbox" id="scatterPlot" checked> Scatter plot <input type="checkbox" id="plot3D"> 3D Scatter plot (requires "rgl")</p>
 					<p><input type="checkbox" id="histDensity" onchange="document.getElementById('merge3Groups').disabled=!this.checked"> Overlap histogram and density plot <input type="checkbox" id="merge3Groups" onchange="document.getElementById('histDensity').disabled=!this.checked"> Overlap three groups in density plot</p>
 				</div>
@@ -394,25 +403,25 @@
 			<fieldset>
 				<legend>Cutoffs</legend>
 				<div id="divCutoff" class="subsection">
+					<p>Specify a global cutoff (quantile): <input type="text" id="globalCO" size=4 value="0.25"> (if other ways don't work)</p>
 					<p>Way of determining cutoffs: <select id="howCO" onchange="
 						if (this.value==1){ document.getElementById('divUserCO').style.display='block'; }
 						else{ document.getElementById('divUserCO').style.display='none'; }
-						if (this.value<3){ document.getElementById('divOutlier').style.display='none'; }
-						else{ document.getElementById('divOutlier').style.display='block'; }
-						if (this.value==3 || this.value==4){ document.getElementById('divStringency').style.display='block'; }
-						else{ document.getElementById('divStringency').style.display='none'; }
-						if (this.value==3){ document.getElementById('divNbin').style.display='block'; }
-						else{ document.getElementById('divNbin').style.display='none'; }
+						if (this.value<3){ document.getElementById('divOutlier').style.display='none'; document.getElementById('divDiptest').style.display='none'; }
+						else{ document.getElementById('divOutlier').style.display='block'; document.getElementById('divDiptest').style.display='block'; }
+						if (this.value==3){ document.getElementById('divHist').style.display='block'; }
+						else{ document.getElementById('divHist').style.display='none'; }
+						if (this.value==4){ document.getElementById('divKDE').style.display='block'; }
+						else{ document.getElementById('divKDE').style.display='none'; }
 						">
-						<option value=0>user-specified global cutoff (%)</option>
+						<option value=0>user-specified global cutoff</option>
 						<option value=1>user-specified individual cutoffs</option>
 						<option value=2>wait for user to type individual cutoffs</option>
-						<option value=3 selected="selected">draw histogram and isolate the first peak</option>
-						<option value=4>(requires R) perform kernel density estimation and isolate the first peak</option>
-						<option value=5>(requires R) perform hierarchical clustering and isolate the first cluster</option>
+						<option value=3>draw histogram and isolate the first peak</option>
+						<option value=4 selected="selected">perform kernel density estimation and isolate the first peak</option>
+						<option value=5>perform hierarchical clustering and isolate the first cluster (requires R)</option>
 					</select></p>
-					<div id="divGlobalCO" class="subsection"><p>User-specified global cutoff (%): <input type="text" id="globalCO" size=4 value="25%"> (complementary to other ways)</p></div>
-					<div id="divUserCO" class="subsection" style="display:none"><p>User-specified cutoffs for individual groups<br>Self: <input type="text" id="selfCO" size=4> Close: <input type="text" id="closeCO" size=4> Distal: <input type="text" id="distalCO" size=4></p></div>
+					<div id="divUserCO" class="subsection" style="display:none"><p>User-specified cutoffs for individual groups (absolute values):</p><p>Self: <input type="text" id="selfCO" size=4> Close: <input type="text" id="closeCO" size=4> Distal: <input type="text" id="distalCO" size=4></p></div>
 					<div id="divOutlier" class="subsection">
 						<p><input type="checkbox" onchange="document.getElementById('exOutlier').disabled=!this.checked">
 						 Exclude outliers at high end of each group, using: <select id="exOutlier" disabled>
@@ -421,15 +430,37 @@
 							<option value=3>modified Z-score</option>
 						 </select> method.</p>
 					</div>
-					<div id="divNbin" class="subsection"><p>Number of bins in histogram: <input type="text" id="nBin" size=4 value="20"></p></div>
-					<div id="divStringency" class="subsection"><p>Stringency of picking cutoffs: <select id="stringency"><option value=0>liberal</option><option value=1 selected="selected">conservative</option></select></p></div>
+					<div id="divDiptest" class="subsection">
+						<p><input id="dipTest" type="checkbox" onchange="document.getElementById('isDipSig').disabled=!this.checked"> Test for non-unimodality (requires R). [<a href="javascript:show_hide_tooltip('Dip')">?</a>] 
+						<input id="isDipSig" type="checkbox" onchange="document.getElementById('dipSig').disabled=!this.checked" disabled> P-value threshold: <input type="text" id="dipSig" size=2 value="0.05" disabled> [<a href="javascript:show_hide_tooltip('DipSig')">?</a>]</p>
+						<p class="tooltip" id="tipDip" style="display:none">Perform Hartigan's dip test using R package <b>diptest</b> to assess the significance of non-unimodality of weight distribution. The smaller the p-value is, the more comfortable it is to split the population.</p>
+						<p class="tooltip" id="tipDipSig" style="display:none">If p-value >= this threshold (meaning non-unimodality is insignificant), global cutoff will be used, instead of determining cutoff using statistical approaches.</p>
+					</div>
+					<div id="divHist" class="subsection" style="display:none">
+						<p>Number of bins in histogram: <input type="text" id="nBin" size=4 value="20"> <input type="checkbox" id="plotHist"> Plot histogram on screen</p>
+					</div>
+					<div id="divKDE" class="subsection">
+						<p>Perform kernel density estimation using: <select id="toolKDE" value=0><option value=0>self-written Perl code</option><option value=1>R command "density" (requires R)</option></select> [<a href="javascript:show_hide_tooltip('KDE')">?</a>]
+						<p class="tooltip" id="tipKDE" style="display:none">Kernel density estimation (KDE) is a statistical approach to estimate the probability density function of a weight population. It can be considered as a smoothed histogram. The program will perform KDE using R command <b>density</b> with its default parameters (Gaussian kernel), or using self-written Perl code with parameters that mimic the R command.</p>
+						<p>Bandwidth selection factor: <input type="text" id="bwF" size=2 value="1"> [<a href="javascript:show_hide_tooltip('BW')">?</a>] <input type="checkbox" id="plotKDE"> Plot kernel density function on screen.</p>
+						<p class="tooltip" id="tipBW" style="display:none">A <b>bandwidth</b> indicates how "smooth" the density function curve is. The program uses Silverman's rule-of-thumb equation to compute an optimal bandwidth. One can further apply a factor on it. The smaller the factor is, the more resolved (in terms of peaks/pits) the curve will be.</p>
+						<p>Identify local extrema using: <select id="toolExtrema" value=0><option value=0>self-written Perl code</option><option value=1>R package "pastecs" (requires R)</option></select> [<a href="javascript:show_hide_tooltip('Extrema')">?</a>]
+						<p class="tooltip" id="tipExtrema" style="display:none">Local extrema (minima of pits and maxima of peaks) will be identified either using self-written Perl code, or using R command <b>turnpoints</b> of package <b>pastecs</b>, which is more robust in statistics.</p>
+						<p>Cutoff point location: <select id="modKCO" onchange="if (this.value>=2){ document.getElementById('qKCO').disabled=false; }else{ document.getElementById('qKCO').disabled=true; }">
+							<option value=0>1st pit from low end</option>
+							<option value=1 selected>horizontal midpoint between 1st peak and 1st pit</option>
+							<option value=2>horizontal quantile from 1st pit toward 1st peak, as:</option>
+							<option value=3>vertical quantile from 1st pit toward 1st peak, as:</option>
+						 </select>
+						 <input type="text" id="qKCO" size=4 value="0.5" disabled></p>
+					</div>
 				</div>
 			</fieldset>
 			<br>
 			<fieldset>
 				<legend>Prediction</legend>
 				<div id="divPredict" class="subsection">
-					<p>Minimum number of hits of protein: <input type="text" id="minHits" size=4 value="0"> Minimum size (aa) of protein: <input type="text" id="minSize" size=4 value="40"></p>
+					<p>Minimum number of hits of protein: <input type="text" id="minHits" size=4 value="0"> Minimum size (aa) of protein: <input type="text" id="minSize" size=4 value="0"></p>
 					<p>Rule #1: <b>close</b> weight is smaller than cutoff.</p>
 					<p>Rule #2: <b>distal</b> weight is larger than or equal to cutoff.</p>
 					<p><input type="checkbox" id="selfLow"> Rule #3 (optional): <b>self</b> weight is smaller than cutoff.</p>
@@ -450,9 +481,14 @@
 			<p class="tooltip" id="tipFunction" style="display:none">You need to provide external sources of functional annotation information, for example, reports generated by Blast2GO. They should be placed in one directory, with their names identical to the input protein set names.</p>
 			<p><input type="checkbox" id="byOrthology" onchange="if(this.checked){document.getElementById('divOrthology').style.display='block'}else{document.getElementById('divOrthology').style.display='none'}"> Summarize HGT events by gene orthology (evolutionary history of individual gene families).
 			<div class="subsection" id="divOrthology" style="display:none">
+				<p><input type="radio" name="orthologing" onclick="change_orthologing()"> Refer to an external gene orthology scheme file:</p>
+				<div id="divOutOrthologing" class="subsection" style="display:none">
+					<p><input type="file" id="smOrthology" size=40> [<a href="javascript:show_hide_tooltip('OutOrthologing')">?</a>]</p>
+					<p class="tooltip" id="tipOutOrthologing" style="display:none">You can use external programs such as OrthoMCL and blastclust to infer a gene orthology scheme. The result can be directly read by this program. If this box is left blank, the program will try to locate the default orthology scheme file, taxonomy/orthology.db, which might be generated in a previous run. If it is absent, the program will compute one using the built-in function (see below).</p>
+				</div>
 				<p><input type="radio" name="orthologing" onclick="change_orthologing()"> Let the program infer gene orthology using its built-in function.</p>
 				<div id="divInOrthologing" class="subsection" style="display:none">
-					<p>Two genes are defined as a (co-)orthologous pair if they: 
+					<p>Rule: two genes are defined as (co-)orthologous if they: 
 					<select id="pairRule">
 						<option value=1>one is a hit of the other</option>
 						<option value=2>one is the best hit of the other</option>
@@ -461,18 +497,13 @@
 						<option value=5>one is the best hit, the other is any hit (COG)</option>
 					</select></p>
 				</div>
-				<p><input type="radio" name="orthologing" onclick="change_orthologing()"> Refer to an external gene orthology scheme file:</p>
-				<div id="divOutOrthologing" class="subsection" style="display:none">
-					<p><input type="file" id="smOrthology" size=40> [<a href="javascript:show_hide_tooltip('OutOrthologing')">?</a>]</p>
-					<p class="tooltip" id="tipOutOrthologing" style="display:none">You can use programs such as OrthoMCL, blastclust to infer a gene orthology scheme. Refer to the manual for details.</p>
-				</div>
 				<script>
 					function change_orthologing(){
-						if (document.getElementsByName('orthologing')[0].checked){
+						if (document.getElementsByName('orthologing')[1].checked){
 							document.getElementById('divInOrthologing').style.display = "block";
 							document.getElementById('divOutOrthologing').style.display = "none";
 						}
-						if (document.getElementsByName('orthologing')[1].checked){
+						if (document.getElementsByName('orthologing')[0].checked){
 							document.getElementById('divInOrthologing').style.display = "none";
 							document.getElementById('divOutOrthologing').style.display = "block";
 						}
@@ -489,7 +520,7 @@
 			<p>Task completed!</p>
 			<p>Please create a text file named "config.txt" in the working directory, then copy & paste the content below to that file.</p>
 			<p><textarea id="output" rows="20" cols="80"></textarea></p>
-			<p>Then, you can open a terminal, move into the program directory (where there's HGTector.pl), and execute this command:</p>
+			<p>Then, you can open a terminal, navigate into the program directory (where there's HGTector.pl), and execute this command:</p>
 			<blockquote><code>perl HGTector.pl working_directory</code></blockquote>
 			<p>And see how the program rolls!</p>
 		</div>

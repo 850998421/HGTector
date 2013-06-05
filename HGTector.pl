@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-# HGTector (version 0.1.6): Genome-wide detection of horizontal gene transfer based on Blast hit distribution statistics
+# HGTector (version 0.1.7): Genome-wide detection of horizontal gene transfer based on Blast hit distribution statistics
 # Copyright (C) 2013, Qiyun Zhu, Katharina Dittmar. All rights reserved.
 # Licensed under BSD 2-clause license.
 
@@ -11,7 +11,7 @@ $| = 1;
 print "
 
 |---------------------|
-|   HGTector v0.1.6   |
+|   HGTector v0.1.7   |
 |---------------------|
 
 ";
@@ -55,18 +55,21 @@ if (@ARGV){
 die "Error: invalid working directory $wkDir.\n" unless -d $wkDir;
 
 
+
 ## read configuration ##
+
+$tasks = $blaster + $taxonomer + $purifier + $analyzer + $summarizer;
 
 if (-e "$wkDir/config.txt"){
 	print "Reading configuration...";
 	open IN, "<$wkDir/config.txt";
 	while (<IN>){
 		s/#.*$//; s/\s+$//; s/^\s+//; next unless $_;
-		$blaster = 1 if /^blaster=1$/;
-		$taxonomer = 1 if /^taxonomer=1$/;
-		$purifier = 1 if /^purifier=1$/;
-		$analyzer = 1 if /^analyzer=1$/;
-		$summarizer = 1 if /^summarizer=1$/;
+		$blaster = 1 if /^blaster=1$/ and not $tasks;
+		$taxonomer = 1 if /^taxonomer=1$/ and not $tasks;
+		$purifier = 1 if /^purifier=1$/ and not $tasks;
+		$analyzer = 1 if /^analyzer=1$/ and not $tasks;
+		$summarizer = 1 if /^summarizer=1$/ and not $tasks;
 		$blastMode = $1 if /^blastMode=(\d)$/;
 		$nBlaster = $1 if /^nBlaster=(\d+)$/;
 	}
